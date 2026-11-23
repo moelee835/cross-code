@@ -2,6 +2,8 @@
 
 상태는 설계 제안이다. 이 문서의 구현 기준은 OpenCode `bab0d0413ff31edd07b55fc499294e2e031c57d2`이며, Mesh 분석 기준은 `@log0u7/opencode-mesh` 0.10.8의 `6aa6635d8d4e5427e8508ab3587fcd101ba85a88`이다. [OpenCode 기준 커밋](https://github.com/anomalyco/opencode/commit/bab0d0413ff31edd07b55fc499294e2e031c57d2) · [Mesh 기준 커밋](https://github.com/log0u7/opencode-mesh/commit/6aa6635d8d4e5427e8508ab3587fcd101ba85a88)
 
+작업 단위, DB와 API 변경 지점, 수용 테스트는 별도 구현 계획에 적었다. [구현 계획](cross-session-messaging-implementation.md)
+
 ## 목표와 첫 릴리스 범위
 
 이미 열린 세션 A의 에이전트가 세션 B를 조회하고 텍스트 요청을 보낸다. B가 유휴 상태면 메시지 본문으로 턴을 시작한다. 실행 중이면 다음 입력 경계에 요청을 처리한다. B의 결과는 같은 요청 ID로 A에 돌아오며, 열린 A가 자동으로 결과를 이어받는다. 사람이 터미널 사이에서 메시지를 복사하거나 B에 별도 초기 프롬프트를 입력할 필요가 없다.
@@ -79,7 +81,7 @@ sequenceDiagram
 | `session_message_send` | `recipientSessionID`와 텍스트를 받아 영속 접수 결과와 `requestID`를 즉시 반환한다. HTTP는 새 접수를 `202 Accepted`로 표현한다. |
 | `session_message_result` | 참가 세션에서 `requestID`의 현재 상태와 저장된 답변을 한 번 조회한다. 미완료 요청도 현재 상태를 즉시 반환한다. |
 | `session_message_reply` | 연결된 요청이 `needs_reply` 상태일 때 수신 세션이 공유할 답변을 등록한다. |
-| CLI 및 TUI | `cross-code sessions live`, `cross-code messages send`, `cross-code messages result`를 후보로 둔다. TUI는 세션 목록과 대화 기록에서 발신처와 결과 상태를 확인하게 한다. |
+| CLI 및 TUI | `cross-code session peers`, `cross-code session send`, `cross-code session result`를 기존 `session` 명령 그룹에 추가한다. TUI는 세션 목록과 대화 기록에서 발신처와 결과 상태를 확인하게 한다. |
 | HTTP 및 SDK | `/api/experimental/session-messaging/...` 계열에 임대 등록·갱신·해제와 조회·전송·결과·답변 작업을 둔다. 식별자와 생성 SDK는 저장소의 실험 API 규칙을 따른다. |
 
 의존 방향은 `schema`에서 `core`와 `protocol`로, `core`와 `protocol`에서 `server`로 이어진다. `client`는 `schema` 및 `protocol`을 사용한다. 코어의 DB·실행 연동은 서버 라우트나 TUI에서 임의로 우회하지 않는다. 도구는 Location의 기존 `Tool.Service`와 `Permission.invocation`을 사용한다. 공개 API 수정 후에는 `packages/client`에서 `bun run generate`를 실행한다. opt-in-only 플래그 후보는 `session_messaging`이다. [패키지 및 코드 생성 규칙](../../AGENTS.md) · [도구 등록 및 권한](../../packages/core/src/tool/AGENTS.md) · [플래그 레지스트리](../../packages/schema/src/config/flag.ts)
