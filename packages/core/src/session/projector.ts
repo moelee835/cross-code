@@ -14,6 +14,7 @@ import { SessionEvent } from "./event.js"
 import { SessionMessage } from "./message.js"
 import { SessionMessageUpdater } from "./message-updater.js"
 import { SessionInbox } from "./inbox.js"
+import { SessionMessagingProjection } from "./messaging/projection.js"
 import { InstructionState } from "./instruction-state.js"
 import { SessionBlob } from "./blob.js"
 import { SessionInboxTable, SessionMessageTable, SessionPartTable, SessionTable, type SessionPartData } from "./sql.js"
@@ -1026,7 +1027,7 @@ const layer = Layer.effectDiscard(
             skills: input.payload.skills,
             time,
           })
-        if (input.type === "synthetic")
+        if (input.type === "synthetic") {
           yield* insertMessage(db, event, {
             id: input.id,
             type: "synthetic",
@@ -1035,6 +1036,11 @@ const layer = Layer.effectDiscard(
             metadata: input.payload.metadata,
             time,
           })
+          yield* SessionMessagingProjection.transition(db, event.data, "queued", {
+            status: "running",
+            delivered_seq: event.durable.seq,
+          })
+        }
       }),
     )
     yield* bus.project(SessionEvent.InboxEnqueued, (event) =>
@@ -1046,13 +1052,18 @@ const layer = Layer.effectDiscard(
           item: event.data.item,
           timeCreated: event.created,
         })
+        if (event.data.item.type === "synthetic")
+          yield* SessionMessagingProjection.transition(db, event.data, "accepted", { status: "queued" })
         yield* touch(db, event)
       }),
     )
     yield* bus.project(SessionEvent.InboxCancelled, (event) =>
-      SessionInbox.projectCancelled(db, {
-        id: event.data.inboxID,
-        sessionID: event.data.sessionID,
+      Effect.gen(function* () {
+        yield* SessionInbox.projectCancelled(db, {
+          id: event.data.inboxID,
+          sessionID: event.data.sessionID,
+        })
+        yield* SessionMessagingProjection.transition(db, event.data, "queued", { status: "cancelled" })
       }),
     )
     yield* bus.project(SessionEvent.InboxDeliveryChanged, (event) =>

@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm"
 import { directoryColumn, pathColumn } from "../database/path.js"
 import { ProjectTable } from "../project/sql.js"
 import type { SessionMessage } from "./message.js"
+import type { SessionMessaging } from "@opencode/schema/session-messaging"
 import type { SessionInbox } from "./inbox.js"
 import type { Agent } from "@opencode/schema/agent"
 import type { FileDiff } from "@opencode/schema/file-diff"
@@ -148,6 +149,32 @@ export const SessionInboxTable = sqliteTable(
   (table) => [
     index("session_inbox_session_delivery_seq_idx").on(table.session_id, table.delivery, table.enqueued_seq),
     uniqueIndex("session_inbox_session_enqueued_seq_idx").on(table.session_id, table.enqueued_seq),
+  ],
+)
+
+export const SessionMessagingRequestTable = sqliteTable(
+  "session_messaging_request",
+  {
+    id: text().$type<SessionMessaging.ID>().primaryKey(),
+    sender_session_id: text()
+      .$type<SessionSchema.ID>()
+      .notNull()
+      .references(() => SessionTable.id, { onDelete: "cascade" }),
+    recipient_session_id: text()
+      .$type<SessionSchema.ID>()
+      .notNull()
+      .references(() => SessionTable.id, { onDelete: "cascade" }),
+    idempotency_key: text().notNull(),
+    inbox_id: text().$type<SessionMessage.ID>().notNull(),
+    body: text().notNull(),
+    status: text().$type<SessionMessaging.Status>().notNull(),
+    delivered_seq: integer(),
+  },
+  (table) => [
+    uniqueIndex("session_messaging_request_sender_key_idx").on(table.sender_session_id, table.idempotency_key),
+    uniqueIndex("session_messaging_request_inbox_idx").on(table.inbox_id),
+    index("session_messaging_request_status_idx").on(table.status, table.id),
+    index("session_messaging_request_recipient_status_idx").on(table.recipient_session_id, table.status),
   ],
 )
 

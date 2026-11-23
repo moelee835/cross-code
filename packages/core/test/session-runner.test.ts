@@ -43,6 +43,7 @@ import { SessionEvent } from "@opencode/core/session/event"
 import { SessionCompaction } from "@opencode/core/session/compaction"
 import { SessionInbox } from "@opencode/core/session/inbox"
 import { SessionMessage } from "@opencode/core/session/message"
+import { SessionMessaging } from "@opencode/core/session/messaging/messaging"
 import { SessionModelTransport } from "@opencode/core/session/model-transport"
 import { Money } from "@opencode/schema/money"
 import { SessionProjector } from "@opencode/core/session/projector"
@@ -543,6 +544,7 @@ const layer = Layer.unwrap(
         LayerNodePlatform.llmClient,
         SessionRunnerLLM.node,
         SessionExecution.node,
+        SessionMessaging.node,
         Session.node,
       ]),
       [
@@ -759,6 +761,75 @@ const messageTexts = (request: LLMRequest, role: "user" | "system") =>
 const userTexts = (request: LLMRequest) => messageTexts(request, "user")
 const systemTexts = (request: LLMRequest) => messageTexts(request, "system")
 const messageRoles = (request: LLMRequest | undefined) => request?.messages.map((message) => message.role)
+
+scenario("continues the sender's turn and accepts a new prompt while the peer's response is held", function* (s) {
+  yield* insertSession(otherSessionID)
+  const messaging = yield* SessionMessaging.Service
+  const tools = yield* Tool.Service
+  const execution = yield* SessionExecution.Service
+  const receiverStarted = yield* Deferred.make<void>()
+  const releaseReceiver = yield* Deferred.make<void>()
+  const input = {
+    recipientSessionID: otherSessionID,
+    idempotencyKey: "send-to-peer",
+    text: "Check the peer task",
+  }
+  yield* transformTools(
+    tools,
+    {
+      test_peer_send: {
+        name: "test_peer_send",
+        description: "Queue a request for the peer",
+        input: Schema.Struct({}),
+        output: SessionMessaging.Receipt,
+        execute: (_, context) =>
+          messaging.send(context.sessionID, input).pipe(
+            Effect.orDie,
+            Effect.map((output) => ({ output, content: JSON.stringify(output) })),
+          ),
+      },
+    },
+    { codemode: false },
+  )
+  yield* s.llm.push(TestLLM.toolCall("send-to-peer", "test_peer_send", {}))
+  yield* s.llm.serve((request) => {
+    const text = userTexts(request).at(-1)
+    if (text === input.text)
+      return Stream.fromEffect(
+        Deferred.succeed(receiverStarted, undefined).pipe(Effect.andThen(Deferred.await(releaseReceiver))),
+      ).pipe(Stream.flatMap(() => Stream.fromIterable(TestLLM.text("Peer response", "peer-response"))))
+    if (text === "Ask the peer" && s.executions.length === 0)
+      return TestLLM.toolCall("sender-next-tool", "echo", { text: "Sender kept working" })
+    if (text === "Ask the peer") return TestLLM.text("Sender finished its first turn", "sender-first")
+    return TestLLM.text("Sender handled new input", "sender-second")
+  })
+
+  yield* s.runPrompt("Ask the peer")
+  yield* Deferred.await(receiverStarted)
+  expect(s.executions).toEqual(["Sender kept working"])
+  expect(yield* execution.isActive(otherSessionID)).toBe(true)
+  yield* s.runPrompt("New prompt while the peer is busy")
+  const senderText = (yield* s.messages).flatMap((message) =>
+    message.type === "assistant" ? message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])) : [],
+  )
+  expect(senderText).toEqual(["Sender finished its first turn", "Sender handled new input"])
+
+  const receipt = yield* messaging.send(sessionID, input)
+  expect(receipt.status).toBe("running")
+  expect(yield* messaging.result(otherSessionID, receipt.requestID)).toEqual(receipt)
+  expect(yield* messaging.result(Session.ID.create(), receipt.requestID)).toBeUndefined()
+  expect((yield* Effect.flip(messaging.send(sessionID, { ...input, text: "Different text" })))._tag).toBe(
+    "SessionMessaging.Conflict",
+  )
+
+  yield* Deferred.succeed(releaseReceiver, undefined)
+  yield* execution.awaitIdle(otherSessionID)
+  const received = (yield* s.session.messages({ sessionID: otherSessionID })).filter(
+    (message) => message.type === "synthetic",
+  )
+  expect(received.map((message) => message.text)).toEqual([input.text])
+  expect(received[0]?.metadata?.requestID).toBe(receipt.requestID)
+})
 
 const recordedEventTypes = (id: Session.ID) =>
   Effect.gen(function* () {

@@ -1,8 +1,8 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "6fdb1fc8-74cd-4f15-8faa-e109d3030da9",
-  "prevIds": ["74cace2e-430e-4672-bf3b-eba14ae0c399"],
+  "id": "0ac5c930-3b84-425d-be52-3d8bbe194656",
+  "prevIds": ["6fdb1fc8-74cd-4f15-8faa-e109d3030da9"],
   "ddl": [
     {
       "name": "account_state",
@@ -82,6 +82,10 @@
     },
     {
       "name": "session_message",
+      "entityType": "tables"
+    },
+    {
+      "name": "session_messaging_request",
       "entityType": "tables"
     },
     {
@@ -1512,6 +1516,86 @@
     },
     {
       "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "session_messaging_request"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "sender_session_id",
+      "entityType": "columns",
+      "table": "session_messaging_request"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "recipient_session_id",
+      "entityType": "columns",
+      "table": "session_messaging_request"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "idempotency_key",
+      "entityType": "columns",
+      "table": "session_messaging_request"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "inbox_id",
+      "entityType": "columns",
+      "table": "session_messaging_request"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "body",
+      "entityType": "columns",
+      "table": "session_messaging_request"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "status",
+      "entityType": "columns",
+      "table": "session_messaging_request"
+    },
+    {
+      "type": "integer",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "delivered_seq",
+      "entityType": "columns",
+      "table": "session_messaging_request"
+    },
+    {
+      "type": "text",
       "notNull": true,
       "autoincrement": false,
       "default": null,
@@ -2161,6 +2245,28 @@
       "table": "session_message"
     },
     {
+      "columns": ["sender_session_id"],
+      "tableTo": "session_v2",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "fk_session_messaging_request_sender_session_id_session_v2_id_fk",
+      "entityType": "fks",
+      "table": "session_messaging_request"
+    },
+    {
+      "columns": ["recipient_session_id"],
+      "tableTo": "session_v2",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "fk_session_messaging_request_recipient_session_id_session_v2_id_fk",
+      "entityType": "fks",
+      "table": "session_messaging_request"
+    },
+    {
       "columns": ["message_id"],
       "tableTo": "session_message",
       "columnsTo": ["id"],
@@ -2356,6 +2462,13 @@
       "nameExplicit": false,
       "name": "session_message_pk",
       "table": "session_message",
+      "entityType": "pks"
+    },
+    {
+      "columns": ["id"],
+      "nameExplicit": false,
+      "name": "session_messaging_request_pk",
+      "table": "session_messaging_request",
       "entityType": "pks"
     },
     {
@@ -2679,6 +2792,74 @@
       "name": "session_message_time_created_idx",
       "entityType": "indexes",
       "table": "session_message"
+    },
+    {
+      "columns": [
+        {
+          "value": "sender_session_id",
+          "isExpression": false
+        },
+        {
+          "value": "idempotency_key",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "session_messaging_request_sender_key_idx",
+      "entityType": "indexes",
+      "table": "session_messaging_request"
+    },
+    {
+      "columns": [
+        {
+          "value": "inbox_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "session_messaging_request_inbox_idx",
+      "entityType": "indexes",
+      "table": "session_messaging_request"
+    },
+    {
+      "columns": [
+        {
+          "value": "status",
+          "isExpression": false
+        },
+        {
+          "value": "id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "session_messaging_request_status_idx",
+      "entityType": "indexes",
+      "table": "session_messaging_request"
+    },
+    {
+      "columns": [
+        {
+          "value": "recipient_session_id",
+          "isExpression": false
+        },
+        {
+          "value": "status",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "session_messaging_request_recipient_status_idx",
+      "entityType": "indexes",
+      "table": "session_messaging_request"
     },
     {
       "columns": [
