@@ -812,7 +812,7 @@ scenario("continues the sender's turn and accepts a new prompt while the peer's 
   const senderText = (yield* s.messages).flatMap((message) =>
     message.type === "assistant" ? message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])) : [],
   )
-  expect(senderText).toEqual(["Sender finished its first turn", "Sender handled new input"])
+  expect(senderText).toEqual(["Sender handled new input", "Sender finished its first turn"])
 
   const receipt = yield* messaging.send(sessionID, input)
   expect(receipt.status).toBe("running")
