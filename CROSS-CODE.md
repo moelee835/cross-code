@@ -13,6 +13,14 @@ cross-code service restart
 
 Open two sessions in the same project using the default managed service. Run `/peer-messaging` in each session to opt in. The feature is available on an authenticated loopback service with remote access disabled. Closing a session removes it from discovery. Completed results for a closed sender remain recorded and are delivered when the sender reopens.
 
+## Connect a Gemini model
+
+Open `/connect` and choose **Google**. For a personal Google account, choose the API key method and use a [Gemini API key](https://ai.google.dev/gemini-api/docs/api-key).
+
+Cross Code includes `opencode-gemini-auth@2.0.1`. **OAuth with Google (Gemini CLI)** is intended for eligible existing Gemini Code Assist Standard or Enterprise accounts. Set the project's ID with `cross-code service set env OPENCODE_GEMINI_PROJECT_ID YOUR_PROJECT_ID` and run `cross-code service start` before signing in. For a browser on another machine, the plugin can offer a manual callback. Google ended Gemini CLI OAuth for personal accounts, including Google AI Pro and Ultra, and identifies third-party use of Gemini CLI OAuth as a policy violation. [Plugin documentation](https://github.com/jenslys/opencode-gemini-auth/tree/v2.0.1) · [Google policy update](https://github.com/google-gemini/gemini-cli/discussions/22970)
+
+## Send messages from the CLI
+
 ```sh
 cross-code session peers --from "$SENDER"
 cross-code session send --from "$SENDER" --to "$RECIPIENT" --text 'Review the proposed change' --json

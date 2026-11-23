@@ -173,7 +173,11 @@ const loadServer = Effect.fn("PluginModule.loadServer")(function* (
   const loaded = yield* Effect.promise(() =>
     sources ? sources.read(entrypoint) : Host.load(entrypoint).then((module) => ({ module, version: revision })),
   )
-  const value = (yield* Schema.decodeUnknownEffect(Module)(loaded.module).pipe(
+  return { plugin: yield* decodeServer(loaded.module), version: loaded.version }
+})
+
+export const decodeServer = Effect.fn("PluginModule.decodeServer")(function* (module: unknown) {
+  const value = (yield* Schema.decodeUnknownEffect(Module)(module).pipe(
     Effect.mapError(
       (cause) =>
         new LoadError({
@@ -182,5 +186,5 @@ const loadServer = Effect.fn("PluginModule.loadServer")(function* (
         }),
     ),
   )).default
-  return { plugin: "effect" in value ? value : PluginPromise.fromPromise(value), version: loaded.version }
+  return "effect" in value ? value : PluginPromise.fromPromise(value)
 })

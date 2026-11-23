@@ -14,6 +14,7 @@ import termios
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -127,6 +128,21 @@ def smoke(binary, root):
                 body = {"title": title, "location": {"directory": str(root)}, "model": model_ref}
                 return api("/api/session", "POST", body)["data"]["id"]
 
+            def google_methods_ready():
+                location = urllib.parse.urlencode({"location[directory]": str(root)})
+                try:
+                    google = api(f"/api/integration/google?{location}")["data"]
+                except urllib.error.HTTPError as error:
+                    if error.code != 404:
+                        raise
+                    return False
+                methods = google["methods"]
+                return any(m.get("id") == "gemini-cli" and m["type"] == "oauth" for m in methods) and any(
+                    m["type"] == "key" for m in methods
+                )
+
+            until("bundled Gemini OAuth and Google API key options", google_methods_ready)
+            print("The compiled CLI exposes both Google sign-in methods.")
             sender, recipient = create("Sender"), create("Recipient")
             for session in [sender, recipient]:
                 cli("session", "messaging", "--session", session, "--enable")

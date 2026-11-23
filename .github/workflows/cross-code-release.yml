@@ -69,7 +69,7 @@ jobs:
         run: |
           binary="packages/cli/dist/cli-$OPENCODE_TARGET/bin/cross-code"
           mkdir -p artifacts
-          tar -czf "artifacts/cross-code-$OPENCODE_TARGET.tar.gz" -C "$(dirname "$binary")" cross-code
+          tar -czf "artifacts/cross-code-$OPENCODE_TARGET.tar.gz" -C "$(dirname "$binary")" cross-code LICENSE.opencode-gemini-auth
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: cross-code-${{ matrix.target }}

@@ -130,6 +130,9 @@ import { VcsGitPlugin } from "./vcs/git.js"
 import { VerbosityPlugin } from "./verbosity.js"
 import { WarmingPlugin } from "./warming.js"
 import { WellKnownPlugin } from "../wellknown/plugin.js"
+import { PluginModule } from "./module.js"
+
+declare const CROSS_CODE_BUILD: boolean | undefined
 
 const services = [
   Agent.Service,
@@ -265,6 +268,16 @@ export const requirements = LayerNode.group([
 
 export type InternalPlugin = Plugin<Requirements | Scope.Scope>
 
+const geminiAuth = {
+  id: "opencode.provider.google-gemini-cli",
+  effect: (host) =>
+    Effect.promise(() => import("#cross-code-gemini-auth")).pipe(
+      Effect.flatMap(PluginModule.decodeServer),
+      Effect.orDie,
+      Effect.flatMap((plugin) => plugin.effect(host)),
+    ),
+} satisfies InternalPlugin
+
 const pre = [
   ToolInputRepairPlugin.Plugin,
   ConfigWorktreePlugin.Plugin,
@@ -353,7 +366,7 @@ export const list = Effect.fn("PluginInternal.list")(function* () {
         }) satisfies Generation,
     )
   return {
-    pre: resolve(pre),
+    pre: resolve(typeof CROSS_CODE_BUILD === "boolean" && CROSS_CODE_BUILD ? [...pre, geminiAuth] : pre),
     post: resolve(post),
   }
 })

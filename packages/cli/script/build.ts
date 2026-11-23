@@ -11,6 +11,7 @@ import type { BunPlugin } from "bun"
 import pkg from "../package.json"
 import { discoverPluginRuntimeSpecifiers, pluginRuntimeLoaderCode } from "@opencode/plugin/runtime-modules"
 import { buildAppArchive } from "./app-assets"
+import { geminiAuthPlugin, loadGeminiAuth } from "./gemini-auth"
 import { verifyArtifact, verifySimulationGraph } from "./verify-artifact"
 import { resolveOpencodePty } from "./opencode-pty"
 import { NativeArch } from "../../../script/native-arch"
@@ -37,6 +38,7 @@ const solidPlugin = createSolidTransformPlugin()
 const highlights = Script.preview ? undefined : embed(process.env.OPENCODE_RELEASE_NOTES)
 const releaseAssets = new Map<string, Promise<Map<string, string>>>()
 const modelsSnapshot = modelsSnapshotPlugin(await bundledModelsSnapshot())
+const geminiAuth = crossCode ? await loadGeminiAuth() : undefined
 
 const allTargets: {
   os: string
@@ -190,6 +192,7 @@ export default { path: file, version: ${JSON.stringify(opencodePty.version)}, sh
     tsconfig: "./tsconfig.json",
     plugins: [
       appAssetsPlugin,
+      geminiAuthPlugin(geminiAuth?.server),
       solidPlugin,
       parcelWatcherPlugin,
       irohBindingPlugin,
@@ -242,6 +245,7 @@ export default { path: file, version: ${JSON.stringify(opencodePty.version)}, sh
   }
   verifySimulationGraph(simulationInputs)
   await NativeArch.verify(path.join(outdir, name, "bin", item.os === "win32" ? `${binary}.exe` : binary), item.arch)
+  if (geminiAuth) await Bun.write(path.join(outdir, name, "bin", "LICENSE.opencode-gemini-auth"), geminiAuth.license)
 
   await Bun.write(
     path.join(outdir, name, "package.json"),

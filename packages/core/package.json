@@ -30,6 +30,7 @@
     "./*": "./src/*.ts"
   },
   "imports": {
+    "#cross-code-gemini-auth": "./src/plugin/gemini-auth.unbundled.ts",
     "#sqlite": {
       "workerd": "./src/database/sqlite.workerd.ts",
       "bun": "./src/database/sqlite.bun.ts",
