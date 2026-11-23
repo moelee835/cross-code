@@ -1027,7 +1027,7 @@ const layer = Layer.effectDiscard(
             skills: input.payload.skills,
             time,
           })
-        if (input.type === "synthetic") {
+        if (input.type === "synthetic")
           yield* insertMessage(db, event, {
             id: input.id,
             type: "synthetic",
@@ -1036,11 +1036,8 @@ const layer = Layer.effectDiscard(
             metadata: input.payload.metadata,
             time,
           })
-          yield* SessionMessagingProjection.transition(db, event.data, "queued", {
-            status: "running",
-            delivered_seq: event.durable.seq,
-          })
-        }
+        if (input.type === "user" || input.type === "synthetic")
+          yield* SessionMessagingProjection.delivered(db, event.data, event.durable.seq)
       }),
     )
     yield* bus.project(SessionEvent.InboxEnqueued, (event) =>
@@ -1052,8 +1049,7 @@ const layer = Layer.effectDiscard(
           item: event.data.item,
           timeCreated: event.created,
         })
-        if (event.data.item.type === "synthetic")
-          yield* SessionMessagingProjection.transition(db, event.data, "accepted", { status: "queued" })
+        if (event.data.item.type === "synthetic") yield* SessionMessagingProjection.enqueued(db, event.data)
         yield* touch(db, event)
       }),
     )
@@ -1063,7 +1059,7 @@ const layer = Layer.effectDiscard(
           id: event.data.inboxID,
           sessionID: event.data.sessionID,
         })
-        yield* SessionMessagingProjection.transition(db, event.data, "queued", { status: "cancelled" })
+        yield* SessionMessagingProjection.cancelled(db, event.data)
       }),
     )
     yield* bus.project(SessionEvent.InboxDeliveryChanged, (event) =>
@@ -1079,9 +1075,25 @@ const layer = Layer.effectDiscard(
         time_updated: sql`${SessionTable.time_updated}`,
       }),
     )
-    yield* bus.project(SessionEvent.Execution.Succeeded, (event) => projectIdle(db, event))
-    yield* bus.project(SessionEvent.Execution.Failed, (event) => projectIdle(db, event))
-    yield* bus.project(SessionEvent.Execution.Interrupted, (event) => projectIdle(db, event))
+    yield* bus.project(SessionEvent.Execution.Succeeded, (event) =>
+      projectIdle(db, event).pipe(
+        Effect.andThen(SessionMessagingProjection.failRunning(db, event.data.sessionID, "failed")),
+      ),
+    )
+    yield* bus.project(SessionEvent.Execution.Failed, (event) =>
+      projectIdle(db, event).pipe(
+        Effect.andThen(SessionMessagingProjection.failRunning(db, event.data.sessionID, "failed")),
+      ),
+    )
+    yield* bus.project(SessionEvent.Execution.Interrupted, (event) =>
+      projectIdle(db, event).pipe(
+        Effect.andThen(
+          event.data.reason === "shutdown"
+            ? Effect.void
+            : SessionMessagingProjection.failRunning(db, event.data.sessionID, "cancelled"),
+        ),
+      ),
+    )
     yield* bus.project(SessionEvent.InstructionsUpdated, (event) =>
       Effect.gen(function* () {
         yield* run(db, event)
@@ -1154,6 +1166,7 @@ const layer = Layer.effectDiscard(
           .get()
           .pipe(Effect.orDie)
         if (!boundary) return yield* Effect.die(new Error(`Revert boundary message not found: ${event.data.to}`))
+        yield* SessionMessagingProjection.revert(db, event.data.sessionID, boundary.seq)
         yield* db
           .delete(SessionMessageTable)
           .where(

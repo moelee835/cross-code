@@ -2119,6 +2119,7 @@ function SessionNoticeMessageV2(props: { message: SessionMessageInfo }) {
   const [hover, setHover] = createSignal(false)
   const metadata = () => (props.message.type === "synthetic" ? props.message.metadata : undefined)
   const source = () => stringValue(metadata()?.source)
+  const peerMessage = () => source() === "session-messaging" || source() === "session-messaging-result"
   const completion = () => source() === "subagent" || source() === "shell" || source() === "codemode"
   const childID = () => (source() === "subagent" ? stringValue(metadata()?.childID) : undefined)
   const state = () => stringValue(metadata()?.state)
@@ -2129,6 +2130,7 @@ function SessionNoticeMessageV2(props: { message: SessionMessageInfo }) {
   }
   const text = () => {
     if (props.message.type === "system") return props.message.description ?? "Instructions updated"
+    if (props.message.type === "synthetic" && peerMessage()) return props.message.text
     if (props.message.type === "synthetic") return props.message.description ?? ""
     return ""
   }

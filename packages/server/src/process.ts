@@ -3,6 +3,8 @@ export * as ServerProcess from "./process"
 import { NodeHttpServer } from "@effect/platform-node"
 import { Bus } from "@opencode/core/bus"
 import { SessionRestart } from "@opencode/core/session/execution/restart"
+import { SessionMessaging } from "@opencode/core/session/messaging/messaging"
+import { FlagResolve } from "@opencode/core/flag/resolve"
 import { Automation } from "@opencode/core/automation"
 import { SessionSearchBuild } from "@opencode/core/session/search-build"
 import { InstallationEvent } from "@opencode/schema/installation-event"
@@ -118,15 +120,23 @@ export const start = Effect.fn("ServerProcess.start")(function* <E, R>(
         {
           ...options,
           password,
+          sessionMessaging:
+            options.sessionMessaging === true &&
+            FlagResolve.resolve({
+              entries: [],
+              channel: options.app?.channel ?? "latest",
+              overrides: process.env.OPENCODE_FLAGS,
+            }).session_messaging.enabled,
         },
         urls,
       ).pipe(Layer.provideMerge(NodeHttpServer.layerHttpServices)),
       applicationScope,
     )
     if (lifecycle) {
-      yield* installRestartContinuity(Context.get(context, SessionRestart.Service)).pipe(
-        Effect.provideService(Scope.Scope, applicationScope),
-      )
+      yield* installRestartContinuity(
+        Context.get(context, SessionRestart.Service),
+        Context.get(context, SessionMessaging.Service),
+      ).pipe(Effect.provideService(Scope.Scope, applicationScope))
     }
     // Automations run from any server process (`service`, `opencode serve`, or `--standalone`); the table holds all their state.
     yield* Effect.forkIn(Context.get(context, Automation.Service).run, applicationScope)
@@ -269,6 +279,9 @@ function unavailable(status: Status.State) {
  * never released. Claims are written when execution starts (see SessionExecution), so recovery covers
  * graceful restarts and unclean deaths alike — no shutdown hook participates.
  */
-const installRestartContinuity = Effect.fnUntraced(function* (restart: SessionRestart.Interface) {
-  yield* Effect.forkScoped(restart.resumeSuspendedSessions)
+const installRestartContinuity = Effect.fnUntraced(function* (
+  restart: SessionRestart.Interface,
+  messaging: SessionMessaging.Interface,
+) {
+  yield* Effect.forkScoped(restart.resumeSuspendedSessions.pipe(Effect.andThen(messaging.start)))
 })

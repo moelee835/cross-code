@@ -3,6 +3,7 @@ export * as ServerFetch from "./fetch"
 import { Context, Effect, Layer } from "effect"
 import { HttpEffect, HttpMiddleware, HttpRouter, HttpServer } from "effect/http"
 import { SessionRestart } from "@opencode/core/session/execution/restart"
+import { SessionMessaging } from "@opencode/core/session/messaging/messaging"
 import type { LayerNode } from "@opencode/util/effect/layer-node"
 import { isAllowedCorsOrigin } from "./cors"
 import { RequestSite } from "./request-site"
@@ -47,7 +48,11 @@ export const make = Effect.fn("ServerFetch.make")(function* (options: ServerOpti
   ).pipe(withoutParentSpan)
   // Forked so the returned handler is never delayed; resumed drains are already
   // logged and durably recorded by the execution layer.
-  yield* Effect.forkDetach(Context.get(context, SessionRestart.Service).resumeSuspendedSessions)
+  yield* Effect.forkScoped(
+    Context.get(context, SessionRestart.Service).resumeSuspendedSessions.pipe(
+      Effect.andThen(Context.get(context, SessionMessaging.Service).start),
+    ),
+  )
   return Context.get(context, HttpRouter.HttpRouter)
     .asHttpEffect()
     .pipe(

@@ -40,6 +40,7 @@ import type { Pty } from "@opencode/schema/pty"
 import type { Automation } from "@opencode/schema/automation"
 import type { Artifact } from "@opencode/schema/artifact"
 import type { Job } from "@opencode/schema/job"
+import type { SessionMessaging } from "@opencode/schema/session-messaging"
 import type { Reference } from "@opencode/schema/reference"
 import type { Worktree } from "@opencode/schema/worktree"
 import type { Vcs } from "@opencode/schema/vcs"
@@ -2598,6 +2599,78 @@ export type ExperimentalMachineRemoveOperation<E = never> = (
   input: ExperimentalMachineRemoveInput,
 ) => Effect.Effect<ExperimentalMachineRemoveOutput, E>
 
+export type ExperimentalSessionMessagingParticipationInput = { readonly sessionID: Session.ID }
+export type ExperimentalSessionMessagingParticipationOutput = SessionMessaging.Participation
+export type ExperimentalSessionMessagingParticipationOperation<E = never> = (
+  input: ExperimentalSessionMessagingParticipationInput,
+) => Effect.Effect<ExperimentalSessionMessagingParticipationOutput, E>
+
+export type ExperimentalSessionMessagingSetParticipationInput = {
+  readonly sessionID: Session.ID
+  readonly enabled: boolean
+}
+export type ExperimentalSessionMessagingSetParticipationOutput = SessionMessaging.Participation
+export type ExperimentalSessionMessagingSetParticipationOperation<E = never> = (
+  input: ExperimentalSessionMessagingSetParticipationInput,
+) => Effect.Effect<ExperimentalSessionMessagingSetParticipationOutput, E>
+
+export type ExperimentalSessionMessagingOpenLeaseInput = { readonly sessions: ReadonlyArray<Session.ID> }
+export type ExperimentalSessionMessagingOpenLeaseOutput = SessionMessaging.Lease
+export type ExperimentalSessionMessagingOpenLeaseOperation<E = never> = (
+  input: ExperimentalSessionMessagingOpenLeaseInput,
+) => Effect.Effect<ExperimentalSessionMessagingOpenLeaseOutput, E>
+
+export type ExperimentalSessionMessagingRefreshLeaseInput = {
+  readonly leaseID: SessionMessaging.LeaseID
+  readonly sessions: ReadonlyArray<Session.ID>
+}
+export type ExperimentalSessionMessagingRefreshLeaseOutput = SessionMessaging.Lease
+export type ExperimentalSessionMessagingRefreshLeaseOperation<E = never> = (
+  input: ExperimentalSessionMessagingRefreshLeaseInput,
+) => Effect.Effect<ExperimentalSessionMessagingRefreshLeaseOutput, E>
+
+export type ExperimentalSessionMessagingCloseLeaseInput = { readonly leaseID: SessionMessaging.LeaseID }
+export type ExperimentalSessionMessagingCloseLeaseOutput = void
+export type ExperimentalSessionMessagingCloseLeaseOperation<E = never> = (
+  input: ExperimentalSessionMessagingCloseLeaseInput,
+) => Effect.Effect<ExperimentalSessionMessagingCloseLeaseOutput, E>
+
+export type ExperimentalSessionMessagingPeersInput = { readonly sessionID: Session.ID }
+export type ExperimentalSessionMessagingPeersOutput = ReadonlyArray<SessionMessaging.Peer>
+export type ExperimentalSessionMessagingPeersOperation<E = never> = (
+  input: ExperimentalSessionMessagingPeersInput,
+) => Effect.Effect<ExperimentalSessionMessagingPeersOutput, E>
+
+export type ExperimentalSessionMessagingSendInput = {
+  readonly sessionID: Session.ID
+  readonly recipientSessionID: Session.ID
+  readonly idempotencyKey: string
+  readonly text: string
+}
+export type ExperimentalSessionMessagingSendOutput = SessionMessaging.Receipt
+export type ExperimentalSessionMessagingSendOperation<E = never> = (
+  input: ExperimentalSessionMessagingSendInput,
+) => Effect.Effect<ExperimentalSessionMessagingSendOutput, E>
+
+export type ExperimentalSessionMessagingResultInput = {
+  readonly sessionID: Session.ID
+  readonly requestID: SessionMessaging.ID
+}
+export type ExperimentalSessionMessagingResultOutput = SessionMessaging.Result
+export type ExperimentalSessionMessagingResultOperation<E = never> = (
+  input: ExperimentalSessionMessagingResultInput,
+) => Effect.Effect<ExperimentalSessionMessagingResultOutput, E>
+
+export type ExperimentalSessionMessagingReplyInput = {
+  readonly sessionID: Session.ID
+  readonly requestID: SessionMessaging.ID
+  readonly text: string
+}
+export type ExperimentalSessionMessagingReplyOutput = SessionMessaging.Result
+export type ExperimentalSessionMessagingReplyOperation<E = never> = (
+  input: ExperimentalSessionMessagingReplyInput,
+) => Effect.Effect<ExperimentalSessionMessagingReplyOutput, E>
+
 export interface ExperimentalApi<E = never> {
   readonly persistentPty: {
     readonly read: ExperimentalPersistentPtyReadOperation<E>
@@ -2632,6 +2705,17 @@ export interface ExperimentalApi<E = never> {
     readonly list: ExperimentalMachineListOperation<E>
     readonly add: ExperimentalMachineAddOperation<E>
     readonly remove: ExperimentalMachineRemoveOperation<E>
+  }
+  readonly "session-messaging": {
+    readonly participation: ExperimentalSessionMessagingParticipationOperation<E>
+    readonly setParticipation: ExperimentalSessionMessagingSetParticipationOperation<E>
+    readonly openLease: ExperimentalSessionMessagingOpenLeaseOperation<E>
+    readonly refreshLease: ExperimentalSessionMessagingRefreshLeaseOperation<E>
+    readonly closeLease: ExperimentalSessionMessagingCloseLeaseOperation<E>
+    readonly peers: ExperimentalSessionMessagingPeersOperation<E>
+    readonly send: ExperimentalSessionMessagingSendOperation<E>
+    readonly result: ExperimentalSessionMessagingResultOperation<E>
+    readonly reply: ExperimentalSessionMessagingReplyOperation<E>
   }
 }
 

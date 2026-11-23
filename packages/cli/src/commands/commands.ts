@@ -472,6 +472,40 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
       description: "Manage sessions",
       globalFlags: ServerFlags,
       commands: [
+        Spec.make("peers", {
+          description: "List open sessions participating in peer messaging",
+          params: {
+            from: Flag.String("from").pipe(Flag.withDescription("Sending session ID")),
+            json: Flag.Boolean("json"),
+          },
+        }),
+        Spec.make("send", {
+          description: "Send a peer request and return its ID immediately",
+          params: {
+            from: Flag.String("from"),
+            to: Flag.String("to"),
+            text: Flag.String("text"),
+            key: Flag.String("key").pipe(Flag.optional, Flag.withDescription("Retry key to reuse for this request")),
+            json: Flag.Boolean("json"),
+          },
+        }),
+        Spec.make("result", {
+          description: "Read the current status and result of a peer request",
+          params: {
+            from: Flag.String("from"),
+            requestID: Argument.String("requestID"),
+            json: Flag.Boolean("json"),
+          },
+        }),
+        Spec.make("messaging", {
+          description: "Read or change a session's participation in peer messaging",
+          params: {
+            sessionID: Flag.String("session"),
+            enable: Flag.Boolean("enable"),
+            disable: Flag.Boolean("disable"),
+            json: Flag.Boolean("json"),
+          },
+        }),
         Spec.make("list", {
           description: "List top-level sessions in the current project, newest first",
           params: {

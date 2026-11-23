@@ -240,6 +240,21 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
         );
       `)
       yield* tx.run(`
+        CREATE TABLE \`session_messaging_outbox\` (
+          \`inbox_id\` text PRIMARY KEY,
+          \`request_id\` text NOT NULL,
+          \`kind\` text NOT NULL,
+          \`state\` text NOT NULL,
+          CONSTRAINT \`fk_session_messaging_outbox_request_id_session_messaging_request_id_fk\` FOREIGN KEY (\`request_id\`) REFERENCES \`session_messaging_request\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`session_messaging_participation\` (
+          \`session_id\` text PRIMARY KEY,
+          CONSTRAINT \`fk_session_messaging_participation_session_id_session_v2_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session_v2\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`
         CREATE TABLE \`session_messaging_request\` (
           \`id\` text PRIMARY KEY,
           \`sender_session_id\` text NOT NULL,
@@ -249,6 +264,9 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
           \`body\` text NOT NULL,
           \`status\` text NOT NULL,
           \`delivered_seq\` integer,
+          \`assistant_message_id\` text,
+          \`result\` text,
+          \`depth\` integer DEFAULT 0 NOT NULL,
           CONSTRAINT \`fk_session_messaging_request_sender_session_id_session_v2_id_fk\` FOREIGN KEY (\`sender_session_id\`) REFERENCES \`session_v2\`(\`id\`) ON DELETE CASCADE,
           CONSTRAINT \`fk_session_messaging_request_recipient_session_id_session_v2_id_fk\` FOREIGN KEY (\`recipient_session_id\`) REFERENCES \`session_v2\`(\`id\`) ON DELETE CASCADE
         );
@@ -361,6 +379,12 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
         `CREATE INDEX \`session_message_session_time_created_id_idx\` ON \`session_message\` (\`session_id\`,\`time_created\`,\`id\`);`,
       )
       yield* tx.run(`CREATE INDEX \`session_message_time_created_idx\` ON \`session_message\` (\`time_created\`);`)
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`session_messaging_outbox_request_kind_idx\` ON \`session_messaging_outbox\` (\`request_id\`,\`kind\`);`,
+      )
+      yield* tx.run(
+        `CREATE INDEX \`session_messaging_outbox_state_idx\` ON \`session_messaging_outbox\` (\`state\`,\`inbox_id\`);`,
+      )
       yield* tx.run(
         `CREATE UNIQUE INDEX \`session_messaging_request_sender_key_idx\` ON \`session_messaging_request\` (\`sender_session_id\`,\`idempotency_key\`);`,
       )

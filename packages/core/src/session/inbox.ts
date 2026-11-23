@@ -25,6 +25,7 @@ import { KeyedMutex } from "../effect/keyed-mutex.js"
 import { SessionEvent } from "./event.js"
 import { SessionBlob } from "./blob.js"
 import { SessionMessage } from "./message.js"
+import { SessionMessagingPolicy } from "./messaging/policy.js"
 import { SessionSchema } from "./schema.js"
 import { SessionStored } from "./stored.js"
 import { SessionInboxTable, SessionMessageTable } from "./sql.js"
@@ -531,36 +532,46 @@ const publish = Effect.fn("SessionInbox.publish")(function* (
   bus: Bus.Interface,
   sessionID: SessionSchema.ID,
   rows: ReadonlyArray<typeof SessionInboxTable.$inferSelect>,
+  messaging: boolean,
 ) {
-  yield* Effect.forEach(
-    rows,
-    (row) => {
-      if (row.type !== "move" && row.type !== "user" && row.type !== "synthetic")
-        return Effect.die(new LifecycleConflict({ id: row.id }))
-      return bus
-        .publish(SessionEvent.InboxDelivered, {
+  const promoted = yield* Effect.forEach(rows, (row) => {
+    if (row.type !== "move" && row.type !== "user" && row.type !== "synthetic")
+      return Effect.die(new LifecycleConflict({ id: row.id }))
+    return bus
+      .publish(
+        SessionEvent.InboxDelivered,
+        {
           sessionID,
           inboxID: row.id,
-        })
-        .pipe(
-          Effect.catchDefect((defect) =>
-            defect instanceof LifecycleConflict
+        },
+        row.type === "synthetic"
+          ? { commit: () => SessionMessagingPolicy.guardPromotion(db, row.id, messaging) }
+          : undefined,
+      )
+      .pipe(
+        Effect.as(1),
+        Effect.catchDefect((defect) =>
+          defect instanceof SessionMessagingPolicy.Revoked
+            ? bus.publish(SessionEvent.InboxCancelled, { sessionID, inboxID: row.id }).pipe(Effect.as(0))
+            : defect instanceof LifecycleConflict
               ? promotedFromMessage(db, sessionID, row.id, row.delivery).pipe(
-                  Effect.flatMap((stored) => (stored !== undefined ? Effect.void : Effect.die(defect))),
+                  Effect.flatMap((stored) => (stored !== undefined ? Effect.succeed(1) : Effect.die(defect))),
                   Effect.orDie,
                 )
               : Effect.die(defect),
-          ),
-        )
-    },
-    { discard: true },
-  )
-  return rows.length
+        ),
+      )
+  })
+  return {
+    count: promoted.reduce((total, count) => total + count, 0),
+    revoked: promoted.includes(0),
+  }
 })
 
 /**
  * Promotes pending input into visible messages and returns the promoted count,
  * or undefined when the runner must first handle a pending control.
+ * "revoked" tells the runner to recheck the inbox after discarding peer input.
  * Steered compaction takes priority over pending prompts, without crossing a move.
  * Only the "input" scope may fall through to one queued input.
  */
@@ -569,6 +580,7 @@ export const promote = Effect.fn("SessionInbox.promote")(function* (
   bus: Bus.Interface,
   sessionID: SessionSchema.ID,
   scope: Promotable,
+  messaging = false,
 ) {
   return yield* serialized(
     sessionID,
@@ -576,14 +588,16 @@ export const promote = Effect.fn("SessionInbox.promote")(function* (
       const steers = yield* pendingSteers(db, sessionID)
       if (steers.length > 0 || scope === "steer") {
         if (steers.length > 0 && isControl(steers[0])) return undefined
-        return yield* publish(db, bus, sessionID, beforeControl(steers))
+        const promoted = yield* publish(db, bus, sessionID, beforeControl(steers), messaging)
+        return promoted.count || (promoted.revoked ? "revoked" : 0)
       }
 
       const queued = yield* firstQueued(db, sessionID)
       if (!queued) return 0
       if (isControl(queued)) return undefined
-      const promoted = yield* publish(db, bus, sessionID, [queued])
-      return promoted + (yield* publish(db, bus, sessionID, beforeControl(yield* pendingSteers(db, sessionID))))
+      const promoted = yield* publish(db, bus, sessionID, [queued], messaging)
+      const trailing = yield* publish(db, bus, sessionID, beforeControl(yield* pendingSteers(db, sessionID)), messaging)
+      return promoted.count + trailing.count || (promoted.revoked || trailing.revoked ? "revoked" : 0)
     }),
   )
 })

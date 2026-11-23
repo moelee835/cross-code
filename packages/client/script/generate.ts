@@ -44,6 +44,7 @@ import { AbsolutePath, RelativePath } from "@opencode/schema/schema"
 import { Session } from "@opencode/schema/session"
 import { SessionMessage } from "@opencode/schema/session-message"
 import { SessionInbox } from "@opencode/schema/session-inbox"
+import { SessionMessaging } from "@opencode/schema/session-messaging"
 import { Shell } from "@opencode/schema/shell"
 import { Skill } from "@opencode/schema/skill"
 import { Snapshot } from "@opencode/schema/snapshot"
@@ -67,6 +68,7 @@ const effectContract = compile(ClientApi, {
   aliases: deprecatedClientPaths,
 })
 const effectTypeReferences = [
+  ...namespaceTypes("SessionMessaging", "@opencode/schema/session-messaging", SessionMessaging),
   ...namespaceTypes("Agent", "@opencode/schema/agent", Agent),
   ...namespaceTypes("Artifact", "@opencode/schema/artifact", Artifact),
   ...namespaceTypes("Automation", "@opencode/schema/automation", Automation),

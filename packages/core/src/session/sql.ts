@@ -169,6 +169,9 @@ export const SessionMessagingRequestTable = sqliteTable(
     body: text().notNull(),
     status: text().$type<SessionMessaging.Status>().notNull(),
     delivered_seq: integer(),
+    assistant_message_id: text().$type<SessionMessage.ID>(),
+    result: text(),
+    depth: integer().notNull().default(0),
   },
   (table) => [
     uniqueIndex("session_messaging_request_sender_key_idx").on(table.sender_session_id, table.idempotency_key),
@@ -177,6 +180,30 @@ export const SessionMessagingRequestTable = sqliteTable(
     index("session_messaging_request_recipient_status_idx").on(table.recipient_session_id, table.status),
   ],
 )
+
+export const SessionMessagingOutboxTable = sqliteTable(
+  "session_messaging_outbox",
+  {
+    inbox_id: text().$type<SessionMessage.ID>().primaryKey(),
+    request_id: text()
+      .$type<SessionMessaging.ID>()
+      .notNull()
+      .references(() => SessionMessagingRequestTable.id, { onDelete: "cascade" }),
+    kind: text().$type<"needs_reply" | "completed" | "failed" | "cancelled">().notNull(),
+    state: text().$type<"pending" | "queued" | "settled">().notNull(),
+  },
+  (table) => [
+    uniqueIndex("session_messaging_outbox_request_kind_idx").on(table.request_id, table.kind),
+    index("session_messaging_outbox_state_idx").on(table.state, table.inbox_id),
+  ],
+)
+
+export const SessionMessagingParticipationTable = sqliteTable("session_messaging_participation", {
+  session_id: text()
+    .$type<SessionSchema.ID>()
+    .primaryKey()
+    .references(() => SessionTable.id, { onDelete: "cascade" }),
+})
 
 export const InstructionEntryTable = sqliteTable(
   "instruction_entry",

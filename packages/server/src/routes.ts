@@ -34,6 +34,8 @@ import { LocationActivity } from "@opencode/core/location-activity"
 import { Identity } from "@opencode/core/machine/identity"
 import { Machines } from "@opencode/core/machine/machines"
 import { SessionSearchBuild } from "@opencode/core/session/search-build"
+import { SessionMessaging } from "@opencode/core/session/messaging/messaging"
+import { SessionMessagingPolicy } from "@opencode/core/session/messaging/policy"
 import { ModelsDev } from "@opencode/core/models-dev"
 import { SessionRestart } from "@opencode/core/session/execution/restart"
 import { Automation } from "@opencode/core/automation"
@@ -92,6 +94,7 @@ const applicationServiceNodes = [
   LocationServiceMap.node,
   LocationActivity.node,
   SessionRestart.node,
+  SessionMessaging.node,
   Automation.node,
   // Read by the blob route.
   BlobStore.node,
@@ -131,7 +134,13 @@ export function createEmbeddedRoutes(
   overrides: LayerNode.Replacements = [],
   instances?: InstanceNode,
 ) {
-  return makeRoutes(ServerAuth.Config.configLayer({ password: Option.none() }), options, () => [], overrides, instances)
+  return makeRoutes(
+    ServerAuth.Config.configLayer({ password: Option.none() }),
+    { ...options, sessionMessaging: false },
+    () => [],
+    overrides,
+    instances,
+  )
 }
 
 function makeRoutes<AuthError, AuthServices>(
@@ -143,6 +152,13 @@ function makeRoutes<AuthError, AuthServices>(
   instances?: InstanceNode,
 ) {
   const standard: LayerNode.Replacements = [
+    SessionMessagingPolicy.node.replace(
+      SessionMessagingPolicy.configured(
+        options.sessionMessaging === true &&
+          !!options.password &&
+          (options.hostname === "127.0.0.1" || options.hostname === "::1"),
+      ),
+    ),
     Database.node.replace(Database.configured(options.database)),
     PersistentPty.node.replace(PersistentPty.configured(options.pty)),
     Bus.node.replace(Bus.configured({ persist: options.events?.persist })),

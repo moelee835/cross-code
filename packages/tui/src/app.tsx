@@ -863,6 +863,34 @@ function App() {
         run: () => local.session.quickSwitch(i + 1),
       })),
       {
+        name: "session.messaging.toggle",
+        title: "Toggle session peer messaging",
+        category: "Session",
+        slash: { name: "peer-messaging" },
+        enabled: () =>
+          sessionTabs.peerMessagingEnabled() &&
+          route.data.type === "session" &&
+          route.data.sessionID.startsWith("ses_"),
+        run: async () => {
+          if (route.data.type !== "session") return
+          const sessionID = route.data.sessionID
+          const messaging = client.api.experimental["session-messaging"]
+          dialog.clear()
+          try {
+            const current = await messaging.participation({ sessionID })
+            const next = await messaging.setParticipation({ sessionID, enabled: !current.enabled })
+            toast.show({
+              variant: "success",
+              message: next.enabled
+                ? "Peer messaging enabled for this session"
+                : "Peer messaging disabled for this session",
+            })
+          } catch (error) {
+            toast.error(error)
+          }
+        },
+      },
+      {
         name: "session.tab.next",
         title: "Next tab",
         category: "Session",

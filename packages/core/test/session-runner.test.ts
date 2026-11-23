@@ -44,6 +44,7 @@ import { SessionCompaction } from "@opencode/core/session/compaction"
 import { SessionInbox } from "@opencode/core/session/inbox"
 import { SessionMessage } from "@opencode/core/session/message"
 import { SessionMessaging } from "@opencode/core/session/messaging/messaging"
+import { SessionMessagingPolicy } from "@opencode/core/session/messaging/policy"
 import { SessionModelTransport } from "@opencode/core/session/model-transport"
 import { Money } from "@opencode/schema/money"
 import { SessionProjector } from "@opencode/core/session/projector"
@@ -60,6 +61,7 @@ import { PluginPromise } from "@opencode/core/plugin/promise"
 import { OptimizePlugin } from "@opencode/core/plugin/optimize"
 import { IdentityPlugin } from "@opencode/core/plugin/identity"
 import { QuestionTool } from "@opencode/core/tool/plugin/question"
+import { SessionMessagingTools } from "@opencode/core/tool/plugin/session-messaging"
 import { Agent } from "@opencode/core/agent"
 import { Config } from "@opencode/core/config"
 import { Document, Info } from "@opencode/schema/config"
@@ -468,6 +470,7 @@ const layer = Layer.unwrap(
       PluginSupervisor.node.replace(Layer.empty),
       Plugin.node.replace(Layer.mock(Plugin.Service, { awaitActivation: Effect.suspend(() => state.activationHook) })),
       SessionModelTransport.node.replace(modelTransport),
+      SessionMessagingPolicy.node.replace(SessionMessagingPolicy.configured(true)),
     ]
     const runnerLayer = AppNodeBuilder.build(SessionRunnerLLM.node, [
       ...replacements,
@@ -767,37 +770,38 @@ scenario("continues the sender's turn and accepts a new prompt while the peer's 
   const messaging = yield* SessionMessaging.Service
   const tools = yield* Tool.Service
   const execution = yield* SessionExecution.Service
+  yield* messaging.start
+  yield* messaging.participation(sessionID, true)
+  yield* messaging.participation(otherSessionID, true)
+  yield* messaging.lease({ sessions: [sessionID, otherSessionID] })
   const receiverStarted = yield* Deferred.make<void>()
   const releaseReceiver = yield* Deferred.make<void>()
+  const resultDelivered = yield* Deferred.make<void>()
   const input = {
     recipientSessionID: otherSessionID,
     idempotencyKey: "send-to-peer",
     text: "Check the peer task",
   }
-  yield* transformTools(
-    tools,
-    {
-      test_peer_send: {
-        name: "test_peer_send",
-        description: "Queue a request for the peer",
-        input: Schema.Struct({}),
-        output: SessionMessaging.Receipt,
-        execute: (_, context) =>
-          messaging.send(context.sessionID, input).pipe(
-            Effect.orDie,
-            Effect.map((output) => ({ output, content: JSON.stringify(output) })),
-          ),
-      },
-    },
-    { codemode: false },
+  yield* SessionMessagingTools.Plugin.effect(host({ tool: { ...host().tool, transform: tools.transform } })).pipe(
+    Effect.provide(permissionLayer({ assert: () => Effect.void })),
   )
-  yield* s.llm.push(TestLLM.toolCall("send-to-peer", "test_peer_send", {}))
+  yield* s.llm.push(
+    TestLLM.toolCall("send-to-peer", "session_message_send", {
+      recipientSessionID: input.recipientSessionID,
+      text: input.text,
+    }),
+  )
   yield* s.llm.serve((request) => {
     const text = userTexts(request).at(-1)
-    if (text === input.text)
+    if (text?.endsWith(input.text))
       return Stream.fromEffect(
         Deferred.succeed(receiverStarted, undefined).pipe(Effect.andThen(Deferred.await(releaseReceiver))),
       ).pipe(Stream.flatMap(() => Stream.fromIterable(TestLLM.text("Peer response", "peer-response"))))
+    if (text?.includes("Peer response")) {
+      return Stream.fromEffect(Deferred.succeed(resultDelivered, undefined)).pipe(
+        Stream.flatMap(() => Stream.fromIterable(TestLLM.text("Sender received the result", "sender-result"))),
+      )
+    }
     if (text === "Ask the peer" && s.executions.length === 0)
       return TestLLM.toolCall("sender-next-tool", "echo", { text: "Sender kept working" })
     if (text === "Ask the peer") return TestLLM.text("Sender finished its first turn", "sender-first")
@@ -814,21 +818,150 @@ scenario("continues the sender's turn and accepts a new prompt while the peer's 
   )
   expect(senderText).toEqual(["Sender handled new input", "Sender finished its first turn"])
 
-  const receipt = yield* messaging.send(sessionID, input)
+  const opening = (yield* s.messages).find(
+    (message) =>
+      message.type === "assistant" &&
+      message.content.some((part) => part.type === "tool" && part.name === "session_message_send"),
+  )
+  expect(opening?.type).toBe("assistant")
+  if (opening?.type !== "assistant") throw new Error("Missing peer send tool call")
+  const receipt = yield* messaging.send(sessionID, { ...input, idempotencyKey: `${opening.id}:send-to-peer` })
   expect(receipt.status).toBe("running")
   expect(yield* messaging.result(otherSessionID, receipt.requestID)).toEqual(receipt)
   expect(yield* messaging.result(Session.ID.create(), receipt.requestID)).toBeUndefined()
-  expect((yield* Effect.flip(messaging.send(sessionID, { ...input, text: "Different text" })))._tag).toBe(
-    "SessionMessaging.Conflict",
-  )
+  expect(
+    (yield* Effect.flip(
+      messaging.send(sessionID, {
+        ...input,
+        idempotencyKey: `${opening.id}:send-to-peer`,
+        text: "Different text",
+      }),
+    ))._tag,
+  ).toBe("SessionMessaging.Conflict")
 
   yield* Deferred.succeed(releaseReceiver, undefined)
   yield* execution.awaitIdle(otherSessionID)
+  yield* Deferred.await(resultDelivered)
+  yield* execution.awaitIdle(sessionID)
+  expect(yield* messaging.result(sessionID, receipt.requestID)).toMatchObject({
+    status: "completed",
+    text: "Peer response",
+  })
   const received = (yield* s.session.messages({ sessionID: otherSessionID })).filter(
     (message) => message.type === "synthetic",
   )
-  expect(received.map((message) => message.text)).toEqual([input.text])
+  expect(received.map((message) => message.text.split("\n\n").at(-1))).toEqual([input.text])
   expect(received[0]?.metadata?.requestID).toBe(receipt.requestID)
+})
+
+scenario("shares an explicit reply after another prompt steers the peer's ongoing turn", function* (s) {
+  yield* insertSession(otherSessionID)
+  const messaging = yield* SessionMessaging.Service
+  const execution = yield* SessionExecution.Service
+  yield* messaging.start
+  yield* messaging.participation(sessionID, true)
+  yield* messaging.participation(otherSessionID, true)
+  yield* messaging.lease({ sessions: [sessionID, otherSessionID] })
+  const started = yield* Deferred.make<void>()
+  const release = yield* Deferred.make<void>()
+  const delivered = yield* Deferred.make<void>()
+  yield* s.llm.serve((request) => {
+    const text = userTexts(request).at(-1)
+    if (text?.endsWith("Peer work"))
+      return Stream.fromEffect(Deferred.succeed(started, undefined).pipe(Effect.andThen(Deferred.await(release)))).pipe(
+        Stream.flatMap(() => Stream.fromIterable(TestLLM.toolCall("continue-peer", "echo", { text: "work" }))),
+      )
+    if (text === "Private user input") return TestLLM.text("Private user response", "private")
+    if (text?.endsWith("Public reply"))
+      return Stream.fromEffect(Deferred.succeed(delivered, undefined)).pipe(
+        Stream.flatMap(() => Stream.fromIterable(TestLLM.text("Received", "received"))),
+      )
+    return TestLLM.text("Waiting for an explicit reply", "waiting")
+  })
+  const sent = yield* messaging.send(sessionID, {
+    recipientSessionID: otherSessionID,
+    idempotencyKey: "steer",
+    text: "Peer work",
+  })
+  yield* Deferred.await(started)
+  yield* s.session.prompt({ sessionID: otherSessionID, text: "Private user input" })
+  yield* Deferred.succeed(release, undefined)
+  yield* execution.awaitIdle(otherSessionID)
+  expect(yield* messaging.result(sessionID, sent.requestID)).toEqual({ ...sent, status: "needs_reply" })
+  expect((yield* Effect.flip(messaging.reply(sessionID, sent.requestID, { text: "Wrong session" })))._tag).toBe(
+    "SessionMessaging.Unavailable",
+  )
+  const reply = yield* messaging.reply(otherSessionID, sent.requestID, { text: "Public reply" })
+  expect(yield* messaging.reply(otherSessionID, sent.requestID, { text: "Public reply" })).toEqual(reply)
+  yield* Deferred.await(delivered)
+  yield* execution.awaitIdle(sessionID)
+  const results = (yield* s.messages).flatMap((message) => (message.type === "synthetic" ? [message.text] : []))
+  expect(results.filter((text) => text.endsWith("Public reply"))).toHaveLength(1)
+  expect(results.join("\n")).not.toContain("Private user response")
+})
+
+scenario("settles two requests to the same peer against their own assistant messages", function* (s) {
+  const secondSender = Session.ID.create()
+  yield* insertSession(otherSessionID)
+  yield* insertSession(secondSender)
+  const messaging = yield* SessionMessaging.Service
+  const execution = yield* SessionExecution.Service
+  yield* messaging.start
+  const participants = [sessionID, otherSessionID, secondSender]
+  yield* Effect.forEach(participants, (id) => messaging.participation(id, true))
+  yield* messaging.lease({ sessions: participants })
+  const started = yield* Deferred.make<void>()
+  const release = yield* Deferred.make<void>()
+  yield* s.llm.serve((request) => {
+    const text = userTexts(request).at(-1)
+    if (text?.endsWith("First peer request"))
+      return Stream.fromEffect(Deferred.succeed(started, undefined).pipe(Effect.andThen(Deferred.await(release)))).pipe(
+        Stream.flatMap(() => Stream.fromIterable(TestLLM.text("First response", "first"))),
+      )
+    if (text?.endsWith("Second peer request")) return TestLLM.text("Second response", "second")
+    return TestLLM.text("Received", "received")
+  })
+  const first = yield* messaging.send(sessionID, {
+    recipientSessionID: otherSessionID,
+    idempotencyKey: "first",
+    text: "First peer request",
+  })
+  yield* Deferred.await(started)
+  const second = yield* messaging.send(secondSender, {
+    recipientSessionID: otherSessionID,
+    idempotencyKey: "second",
+    text: "Second peer request",
+  })
+  const promoted = yield* Queue.unbounded<void>()
+  yield* s.bus.subscribe(SessionEvent.InboxEnqueued).pipe(
+    Stream.filter((event) => event.data.sessionID === otherSessionID),
+    Stream.runForEach(() => Queue.offer(promoted, undefined)),
+    Effect.forkScoped({ startImmediately: true }),
+  )
+  if ((yield* messaging.result(secondSender, second.requestID))?.status === "accepted") yield* Queue.take(promoted)
+  yield* Deferred.succeed(release, undefined)
+  yield* execution.awaitIdle(otherSessionID)
+  const firstResult = yield* messaging.result(sessionID, first.requestID)
+  const secondResult = yield* messaging.result(secondSender, second.requestID)
+  expect(firstResult).toMatchObject({ status: "completed", text: "First response" })
+  expect(secondResult).toMatchObject({ status: "completed", text: "Second response" })
+  expect(firstResult?.assistantMessageID).toBeDefined()
+  expect(secondResult?.assistantMessageID).toBeDefined()
+  expect(firstResult?.assistantMessageID).not.toBe(secondResult?.assistantMessageID)
+})
+
+scenario("lists a peer once until its last open client expires", function* () {
+  yield* insertSession(otherSessionID)
+  const messaging = yield* SessionMessaging.Service
+  yield* messaging.participation(sessionID, true)
+  yield* messaging.participation(otherSessionID, true)
+  const first = yield* messaging.lease({ sessions: [sessionID, otherSessionID] })
+  yield* messaging.lease({ sessions: [otherSessionID] })
+  yield* TestClock.adjust("20 seconds")
+  yield* messaging.lease({ sessions: [sessionID] }, first.leaseID)
+  expect((yield* messaging.peers(sessionID)).map((peer) => peer.sessionID)).toEqual([otherSessionID])
+  yield* TestClock.adjust("11 seconds")
+  expect(yield* messaging.peers(sessionID)).toEqual([])
 })
 
 const recordedEventTypes = (id: Session.ID) =>

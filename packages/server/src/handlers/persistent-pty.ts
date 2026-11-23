@@ -1,4 +1,5 @@
 import { PersistentPty } from "@opencode/core/persistent-pty"
+import { SessionMessaging } from "@opencode/core/session/messaging/messaging"
 import { PtyTicket } from "@opencode/core/pty/ticket"
 import {
   ForbiddenError,
@@ -23,6 +24,7 @@ import { makeAutomation } from "./automation"
 import { makeJob } from "./job"
 import { makeMachine, makeMachineLink } from "./machine"
 import { makeMediaGet } from "./media"
+import { forbidden, peerAccess, peerMutation } from "./session-messaging"
 import { type Outbound, runPtySocket } from "./pty-socket"
 
 export const PersistentPtyHandler = HttpApiBuilder.group(Api, "server.experimental", (handlers) =>
@@ -37,8 +39,26 @@ export const PersistentPtyHandler = HttpApiBuilder.group(Api, "server.experiment
     const automation = yield* makeAutomation
     const machine = yield* makeMachine
     const machineLink = yield* makeMachineLink
+    const messaging = yield* SessionMessaging.Service
 
     return handlers
+      .handle("sessionMessaging.participation", (ctx) => peerAccess(messaging.participation(ctx.params.sessionID)))
+      .handle("sessionMessaging.setParticipation", (ctx) =>
+        peerAccess(messaging.participation(ctx.params.sessionID, ctx.payload.enabled)),
+      )
+      .handle("sessionMessaging.openLease", (ctx) => peerAccess(messaging.lease(ctx.payload)))
+      .handle("sessionMessaging.refreshLease", (ctx) => peerAccess(messaging.lease(ctx.payload, ctx.params.leaseID)))
+      .handle("sessionMessaging.closeLease", (ctx) => messaging.close(ctx.params.leaseID))
+      .handle("sessionMessaging.peers", (ctx) => peerAccess(messaging.peers(ctx.params.sessionID)))
+      .handle("sessionMessaging.send", (ctx) => peerMutation(messaging.send(ctx.params.sessionID, ctx.payload)))
+      .handle("sessionMessaging.result", (ctx) =>
+        messaging
+          .result(ctx.params.sessionID, ctx.params.requestID)
+          .pipe(Effect.flatMap((result) => (result ? Effect.succeed(result) : forbidden()))),
+      )
+      .handle("sessionMessaging.reply", (ctx) =>
+        peerMutation(messaging.reply(ctx.params.sessionID, ctx.params.requestID, ctx.payload)),
+      )
       .handleRaw("media.get", (ctx) => mediaGet(ctx.params.hash, ctx.request))
       .handleRaw("blob.get", (ctx) => blobGet(ctx.params.id, ctx.request))
       .handle("job.list", (ctx) => job.list(ctx.query))

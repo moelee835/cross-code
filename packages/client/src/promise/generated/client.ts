@@ -284,6 +284,24 @@ import type {
   ExperimentalMachineAddOutput,
   ExperimentalMachineRemoveInput,
   ExperimentalMachineRemoveOutput,
+  ExperimentalSessionMessagingParticipationInput,
+  ExperimentalSessionMessagingParticipationOutput,
+  ExperimentalSessionMessagingSetParticipationInput,
+  ExperimentalSessionMessagingSetParticipationOutput,
+  ExperimentalSessionMessagingOpenLeaseInput,
+  ExperimentalSessionMessagingOpenLeaseOutput,
+  ExperimentalSessionMessagingRefreshLeaseInput,
+  ExperimentalSessionMessagingRefreshLeaseOutput,
+  ExperimentalSessionMessagingCloseLeaseInput,
+  ExperimentalSessionMessagingCloseLeaseOutput,
+  ExperimentalSessionMessagingPeersInput,
+  ExperimentalSessionMessagingPeersOutput,
+  ExperimentalSessionMessagingSendInput,
+  ExperimentalSessionMessagingSendOutput,
+  ExperimentalSessionMessagingResultInput,
+  ExperimentalSessionMessagingResultOutput,
+  ExperimentalSessionMessagingReplyInput,
+  ExperimentalSessionMessagingReplyOutput,
   ShellListInput,
   ShellListOutput,
   ShellCreateInput,
@@ -1806,6 +1824,116 @@ export function make(options: ClientOptions) {
               successStatus: 204,
               declaredStatuses: [400, 401, 403, 404],
               empty: true,
+            },
+            requestOptions,
+          ),
+      },
+      "session-messaging": {
+        participation: (input: ExperimentalSessionMessagingParticipationInput, requestOptions?: RequestOptions) =>
+          request<ExperimentalSessionMessagingParticipationOutput>(
+            {
+              method: "GET",
+              path: `/api/experimental/session-messaging/sessions/${encodeURIComponent(input.sessionID)}/participation`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 403],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        setParticipation: (input: ExperimentalSessionMessagingSetParticipationInput, requestOptions?: RequestOptions) =>
+          request<ExperimentalSessionMessagingSetParticipationOutput>(
+            {
+              method: "PUT",
+              path: `/api/experimental/session-messaging/sessions/${encodeURIComponent(input.sessionID)}/participation`,
+              body: { enabled: input["enabled"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 403],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        openLease: (input: ExperimentalSessionMessagingOpenLeaseInput, requestOptions?: RequestOptions) =>
+          request<ExperimentalSessionMessagingOpenLeaseOutput>(
+            {
+              method: "POST",
+              path: `/api/experimental/session-messaging/leases`,
+              body: { sessions: input["sessions"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 403],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        refreshLease: (input: ExperimentalSessionMessagingRefreshLeaseInput, requestOptions?: RequestOptions) =>
+          request<ExperimentalSessionMessagingRefreshLeaseOutput>(
+            {
+              method: "PUT",
+              path: `/api/experimental/session-messaging/leases/${encodeURIComponent(input.leaseID)}`,
+              body: { sessions: input["sessions"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 403],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        closeLease: (input: ExperimentalSessionMessagingCloseLeaseInput, requestOptions?: RequestOptions) =>
+          request<ExperimentalSessionMessagingCloseLeaseOutput>(
+            {
+              method: "DELETE",
+              path: `/api/experimental/session-messaging/leases/${encodeURIComponent(input.leaseID)}`,
+              successStatus: 204,
+              declaredStatuses: [400, 401],
+              empty: true,
+            },
+            requestOptions,
+          ),
+        peers: (input: ExperimentalSessionMessagingPeersInput, requestOptions?: RequestOptions) =>
+          request<ExperimentalSessionMessagingPeersOutput>(
+            {
+              method: "GET",
+              path: `/api/experimental/session-messaging/sessions/${encodeURIComponent(input.sessionID)}/peers`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 403],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        send: (input: ExperimentalSessionMessagingSendInput, requestOptions?: RequestOptions) =>
+          request<ExperimentalSessionMessagingSendOutput>(
+            {
+              method: "POST",
+              path: `/api/experimental/session-messaging/sessions/${encodeURIComponent(input.sessionID)}/requests`,
+              body: {
+                recipientSessionID: input["recipientSessionID"],
+                idempotencyKey: input["idempotencyKey"],
+                text: input["text"],
+              },
+              successStatus: 202,
+              declaredStatuses: [400, 401, 403, 409],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        result: (input: ExperimentalSessionMessagingResultInput, requestOptions?: RequestOptions) =>
+          request<ExperimentalSessionMessagingResultOutput>(
+            {
+              method: "GET",
+              path: `/api/experimental/session-messaging/sessions/${encodeURIComponent(input.sessionID)}/requests/${encodeURIComponent(input.requestID)}`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 403],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        reply: (input: ExperimentalSessionMessagingReplyInput, requestOptions?: RequestOptions) =>
+          request<ExperimentalSessionMessagingReplyOutput>(
+            {
+              method: "POST",
+              path: `/api/experimental/session-messaging/sessions/${encodeURIComponent(input.sessionID)}/requests/${encodeURIComponent(input.requestID)}/reply`,
+              body: { text: input["text"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 403, 409],
+              empty: false,
             },
             requestOptions,
           ),

@@ -9,6 +9,8 @@ export const wildcard = "all"
  */
 export const registry = {
   todo: "Enable the experimental todowrite tool. Off by default in every build, including local and dev; opt in with OPENCODE_FLAGS=todo or experimental.todo: true.",
+  session_messaging:
+    "Enable peer messaging on the authenticated local managed service. Sessions also require explicit participation.",
   media_blob: "Store new session media once in a deduplicated blob table instead of inline in every message row.",
   artifacts: "Enable experimental artifacts backed by pluggable providers.",
   video_generate:
@@ -27,4 +29,4 @@ export const registry = {
 } as const satisfies Record<string, string>
 export type Key = keyof typeof registry
 
-export const optInOnly: ReadonlySet<Key> = new Set(["todo"])
+export const optInOnly: ReadonlySet<Key> = new Set(["todo", "session_messaging"])

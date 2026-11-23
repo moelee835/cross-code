@@ -280,6 +280,24 @@ import type {
   ExperimentalMachineAddOutput,
   ExperimentalMachineRemoveInput,
   ExperimentalMachineRemoveOutput,
+  ExperimentalSessionMessagingParticipationInput,
+  ExperimentalSessionMessagingParticipationOutput,
+  ExperimentalSessionMessagingSetParticipationInput,
+  ExperimentalSessionMessagingSetParticipationOutput,
+  ExperimentalSessionMessagingOpenLeaseInput,
+  ExperimentalSessionMessagingOpenLeaseOutput,
+  ExperimentalSessionMessagingRefreshLeaseInput,
+  ExperimentalSessionMessagingRefreshLeaseOutput,
+  ExperimentalSessionMessagingCloseLeaseInput,
+  ExperimentalSessionMessagingCloseLeaseOutput,
+  ExperimentalSessionMessagingPeersInput,
+  ExperimentalSessionMessagingPeersOutput,
+  ExperimentalSessionMessagingSendInput,
+  ExperimentalSessionMessagingSendOutput,
+  ExperimentalSessionMessagingResultInput,
+  ExperimentalSessionMessagingResultOutput,
+  ExperimentalSessionMessagingReplyInput,
+  ExperimentalSessionMessagingReplyOutput,
   ShellListInput,
   ShellListOutput,
   ShellCreateInput,
@@ -1786,6 +1804,86 @@ const EndpointExperimentalMachineRemove =
       raw["machine.remove"]({ params: { name: input["name"] } }).pipe(Effect.mapError(mapClientError)),
     )
 
+const EndpointExperimentalSessionMessagingParticipation =
+  (raw: RawClient["server.experimental"]) => (input: ExperimentalSessionMessagingParticipationInput) =>
+    preserveEffect<ExperimentalSessionMessagingParticipationOutput>()(
+      raw["sessionMessaging.participation"]({ params: { sessionID: input["sessionID"] } }).pipe(
+        Effect.mapError(mapClientError),
+      ),
+    )
+
+const EndpointExperimentalSessionMessagingSetParticipation =
+  (raw: RawClient["server.experimental"]) => (input: ExperimentalSessionMessagingSetParticipationInput) =>
+    preserveEffect<ExperimentalSessionMessagingSetParticipationOutput>()(
+      raw["sessionMessaging.setParticipation"]({
+        params: { sessionID: input["sessionID"] },
+        payload: { enabled: input["enabled"] },
+      }).pipe(Effect.mapError(mapClientError)),
+    )
+
+const EndpointExperimentalSessionMessagingOpenLease =
+  (raw: RawClient["server.experimental"]) => (input: ExperimentalSessionMessagingOpenLeaseInput) =>
+    preserveEffect<ExperimentalSessionMessagingOpenLeaseOutput>()(
+      raw["sessionMessaging.openLease"]({ payload: { sessions: input["sessions"] } }).pipe(
+        Effect.mapError(mapClientError),
+      ),
+    )
+
+const EndpointExperimentalSessionMessagingRefreshLease =
+  (raw: RawClient["server.experimental"]) => (input: ExperimentalSessionMessagingRefreshLeaseInput) =>
+    preserveEffect<ExperimentalSessionMessagingRefreshLeaseOutput>()(
+      raw["sessionMessaging.refreshLease"]({
+        params: { leaseID: input["leaseID"] },
+        payload: { sessions: input["sessions"] },
+      }).pipe(Effect.mapError(mapClientError)),
+    )
+
+const EndpointExperimentalSessionMessagingCloseLease =
+  (raw: RawClient["server.experimental"]) => (input: ExperimentalSessionMessagingCloseLeaseInput) =>
+    preserveEffect<ExperimentalSessionMessagingCloseLeaseOutput>()(
+      raw["sessionMessaging.closeLease"]({ params: { leaseID: input["leaseID"] } }).pipe(
+        Effect.mapError(mapClientError),
+      ),
+    )
+
+const EndpointExperimentalSessionMessagingPeers =
+  (raw: RawClient["server.experimental"]) => (input: ExperimentalSessionMessagingPeersInput) =>
+    preserveEffect<ExperimentalSessionMessagingPeersOutput>()(
+      raw["sessionMessaging.peers"]({ params: { sessionID: input["sessionID"] } }).pipe(
+        Effect.mapError(mapClientError),
+      ),
+    )
+
+const EndpointExperimentalSessionMessagingSend =
+  (raw: RawClient["server.experimental"]) => (input: ExperimentalSessionMessagingSendInput) =>
+    preserveEffect<ExperimentalSessionMessagingSendOutput>()(
+      raw["sessionMessaging.send"]({
+        params: { sessionID: input["sessionID"] },
+        payload: {
+          recipientSessionID: input["recipientSessionID"],
+          idempotencyKey: input["idempotencyKey"],
+          text: input["text"],
+        },
+      }).pipe(Effect.mapError(mapClientError)),
+    )
+
+const EndpointExperimentalSessionMessagingResult =
+  (raw: RawClient["server.experimental"]) => (input: ExperimentalSessionMessagingResultInput) =>
+    preserveEffect<ExperimentalSessionMessagingResultOutput>()(
+      raw["sessionMessaging.result"]({ params: { sessionID: input["sessionID"], requestID: input["requestID"] } }).pipe(
+        Effect.mapError(mapClientError),
+      ),
+    )
+
+const EndpointExperimentalSessionMessagingReply =
+  (raw: RawClient["server.experimental"]) => (input: ExperimentalSessionMessagingReplyInput) =>
+    preserveEffect<ExperimentalSessionMessagingReplyOutput>()(
+      raw["sessionMessaging.reply"]({
+        params: { sessionID: input["sessionID"], requestID: input["requestID"] },
+        payload: { text: input["text"] },
+      }).pipe(Effect.mapError(mapClientError)),
+    )
+
 const adaptGroupExperimental = (raw: RawClient["server.experimental"]) => ({
   persistentPty: {
     read: EndpointExperimentalPersistentPtyRead(raw),
@@ -1820,6 +1918,17 @@ const adaptGroupExperimental = (raw: RawClient["server.experimental"]) => ({
     list: EndpointExperimentalMachineList(raw),
     add: EndpointExperimentalMachineAdd(raw),
     remove: EndpointExperimentalMachineRemove(raw),
+  },
+  "session-messaging": {
+    participation: EndpointExperimentalSessionMessagingParticipation(raw),
+    setParticipation: EndpointExperimentalSessionMessagingSetParticipation(raw),
+    openLease: EndpointExperimentalSessionMessagingOpenLease(raw),
+    refreshLease: EndpointExperimentalSessionMessagingRefreshLease(raw),
+    closeLease: EndpointExperimentalSessionMessagingCloseLease(raw),
+    peers: EndpointExperimentalSessionMessagingPeers(raw),
+    send: EndpointExperimentalSessionMessagingSend(raw),
+    result: EndpointExperimentalSessionMessagingResult(raw),
+    reply: EndpointExperimentalSessionMessagingReply(raw),
   },
 })
 

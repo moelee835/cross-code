@@ -366,6 +366,21 @@ export type MachineInfo = {
 
 export type MachineReach = { type: "url"; url: string }
 
+export type SessionMessagingParticipation = { enabled: boolean }
+
+export type SessionMessagingLeaseID = string
+
+export type SessionMessagingID = string
+
+export type SessionMessagingStatus =
+  | "accepted"
+  | "queued"
+  | "running"
+  | "needs_reply"
+  | "completed"
+  | "failed"
+  | "cancelled"
+
 export type ReferenceGitSource = { type: "git"; repository: string; branch?: string }
 
 export type VcsBranch = { current?: string; default?: string }
@@ -431,6 +446,8 @@ export type PermissionRule = { action: string; resource: string; effect: Permiss
 export type PluginInfo = { id?: PluginID; source: PluginSource; features: PluginFeatures; state: PluginState }
 
 export type AutomationTarget = { session: SessionID; subagent?: never } | { subagent: AgentID; session?: never }
+
+export type SessionMessagingPeer = { sessionID: SessionID; title: string; busy: boolean }
 
 export type SessionForkBoundary =
   | { type: "before"; messageID: SessionMessageID }
@@ -1040,6 +1057,17 @@ export type MachineInvite = {
   join: string
   expires: number
   reach: Array<MachineReach | { type: "iroh" }>
+}
+
+export type SessionMessagingLease = { leaseID: SessionMessagingLeaseID; expiresAt: number }
+
+export type SessionMessagingReceipt = { requestID: SessionMessagingID; status: SessionMessagingStatus }
+
+export type SessionMessagingResult = {
+  requestID: SessionMessagingID
+  status: SessionMessagingStatus
+  text?: string
+  assistantMessageID?: SessionMessageID
 }
 
 export type VcsInfo = { provider?: string; branch: VcsBranch }
@@ -2662,6 +2690,7 @@ export type ConfigEntry =
           codemode_vm?: boolean
           all_flags?: boolean
           todo?: boolean
+          session_messaging?: boolean
           media_blob?: boolean
           artifacts?: boolean
           video_generate?: boolean | { model?: string | { providerID: string; model: string; variant?: string } }
@@ -4871,6 +4900,57 @@ export type ExperimentalMachineAddOutput = { data: MachineInvite }["data"]
 export type ExperimentalMachineRemoveInput = { readonly name: string }
 
 export type ExperimentalMachineRemoveOutput = void
+
+export type ExperimentalSessionMessagingParticipationInput = { readonly sessionID: string }
+
+export type ExperimentalSessionMessagingParticipationOutput = SessionMessagingParticipation
+
+export type ExperimentalSessionMessagingSetParticipationInput = {
+  readonly sessionID: string
+  readonly enabled: boolean
+}
+
+export type ExperimentalSessionMessagingSetParticipationOutput = SessionMessagingParticipation
+
+export type ExperimentalSessionMessagingOpenLeaseInput = { readonly sessions: ReadonlyArray<string> }
+
+export type ExperimentalSessionMessagingOpenLeaseOutput = SessionMessagingLease
+
+export type ExperimentalSessionMessagingRefreshLeaseInput = {
+  readonly leaseID: string
+  readonly sessions: ReadonlyArray<string>
+}
+
+export type ExperimentalSessionMessagingRefreshLeaseOutput = SessionMessagingLease
+
+export type ExperimentalSessionMessagingCloseLeaseInput = { readonly leaseID: string }
+
+export type ExperimentalSessionMessagingCloseLeaseOutput = void
+
+export type ExperimentalSessionMessagingPeersInput = { readonly sessionID: string }
+
+export type ExperimentalSessionMessagingPeersOutput = Array<SessionMessagingPeer>
+
+export type ExperimentalSessionMessagingSendInput = {
+  readonly sessionID: string
+  readonly recipientSessionID: string
+  readonly idempotencyKey: string
+  readonly text: string
+}
+
+export type ExperimentalSessionMessagingSendOutput = SessionMessagingReceipt
+
+export type ExperimentalSessionMessagingResultInput = { readonly sessionID: string; readonly requestID: string }
+
+export type ExperimentalSessionMessagingResultOutput = SessionMessagingResult
+
+export type ExperimentalSessionMessagingReplyInput = {
+  readonly sessionID: string
+  readonly requestID: string
+  readonly text: string
+}
+
+export type ExperimentalSessionMessagingReplyOutput = SessionMessagingResult
 
 export type ShellListInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
 

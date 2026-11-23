@@ -72,6 +72,7 @@ import { Session } from "../session.js"
 import { SessionCompaction } from "../session/compaction.js"
 import { SessionInstructions } from "../session/instructions.js"
 import { SessionSearch } from "../session/search.js"
+import { SessionMessaging } from "../session/messaging/messaging.js"
 import { SessionSearchBuild } from "../session/search-build.js"
 import { SubagentJob } from "../session/subagent-job.js"
 import { SharedCache } from "../shared-cache.js"
@@ -96,6 +97,7 @@ import { ReadTool } from "../tool/plugin/read.js"
 import { ArtifactTools } from "../tool/plugin/artifact.js"
 import { AutomationTools } from "../tool/plugin/automation.js"
 import { SessionSearchTools } from "../tool/plugin/session-search.js"
+import { SessionMessagingTools } from "../tool/plugin/session-messaging.js"
 import { ShellTool } from "../tool/plugin/shell.js"
 import { SkillTool } from "../tool/plugin/skill.js"
 import { SubagentTool } from "../tool/plugin/subagent.js"
@@ -176,6 +178,7 @@ const services = [
   SessionCompaction.Service,
   SessionInstructions.Service,
   SessionSearch.Service,
+  SessionMessaging.Service,
   SessionSearchBuild.Service,
   SubagentJob.Service,
   SharedCache.Service,
@@ -242,6 +245,7 @@ export const requirements = LayerNode.group([
   SessionCompaction.node,
   SessionInstructions.node,
   SessionSearch.node,
+  SessionMessaging.node,
   SessionSearchBuild.node,
   SubagentJob.node,
   SharedCache.node,
@@ -297,6 +301,7 @@ const pre = [
   AutomationTools.Plugin,
   MachineTools.Plugin,
   SessionSearchTools.Plugin,
+  SessionMessagingTools.Plugin,
   ShellTool.Plugin,
   SkillTool.Plugin,
   SubagentTool.Plugin,

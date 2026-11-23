@@ -1,8 +1,8 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "0ac5c930-3b84-425d-be52-3d8bbe194656",
-  "prevIds": ["6fdb1fc8-74cd-4f15-8faa-e109d3030da9"],
+  "id": "fc73f7f4-80ab-4db1-970c-2861469cf71f",
+  "prevIds": ["c516a205-0bca-4975-beff-7e3b5ee08207"],
   "ddl": [
     {
       "name": "account_state",
@@ -82,6 +82,14 @@
     },
     {
       "name": "session_message",
+      "entityType": "tables"
+    },
+    {
+      "name": "session_messaging_outbox",
+      "entityType": "tables"
+    },
+    {
+      "name": "session_messaging_participation",
       "entityType": "tables"
     },
     {
@@ -1520,6 +1528,56 @@
       "autoincrement": false,
       "default": null,
       "generated": null,
+      "name": "inbox_id",
+      "entityType": "columns",
+      "table": "session_messaging_outbox"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "request_id",
+      "entityType": "columns",
+      "table": "session_messaging_outbox"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "kind",
+      "entityType": "columns",
+      "table": "session_messaging_outbox"
+    },
+    {
+      "type": "text",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "state",
+      "entityType": "columns",
+      "table": "session_messaging_outbox"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "session_id",
+      "entityType": "columns",
+      "table": "session_messaging_participation"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
       "name": "id",
       "entityType": "columns",
       "table": "session_messaging_request"
@@ -1591,6 +1649,36 @@
       "default": null,
       "generated": null,
       "name": "delivered_seq",
+      "entityType": "columns",
+      "table": "session_messaging_request"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "assistant_message_id",
+      "entityType": "columns",
+      "table": "session_messaging_request"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "result",
+      "entityType": "columns",
+      "table": "session_messaging_request"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": "0",
+      "generated": null,
+      "name": "depth",
       "entityType": "columns",
       "table": "session_messaging_request"
     },
@@ -2245,6 +2333,28 @@
       "table": "session_message"
     },
     {
+      "columns": ["request_id"],
+      "tableTo": "session_messaging_request",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "fk_session_messaging_outbox_request_id_session_messaging_request_id_fk",
+      "entityType": "fks",
+      "table": "session_messaging_outbox"
+    },
+    {
+      "columns": ["session_id"],
+      "tableTo": "session_v2",
+      "columnsTo": ["id"],
+      "onUpdate": "NO ACTION",
+      "onDelete": "CASCADE",
+      "nameExplicit": false,
+      "name": "fk_session_messaging_participation_session_id_session_v2_id_fk",
+      "entityType": "fks",
+      "table": "session_messaging_participation"
+    },
+    {
       "columns": ["sender_session_id"],
       "tableTo": "session_v2",
       "columnsTo": ["id"],
@@ -2462,6 +2572,20 @@
       "nameExplicit": false,
       "name": "session_message_pk",
       "table": "session_message",
+      "entityType": "pks"
+    },
+    {
+      "columns": ["inbox_id"],
+      "nameExplicit": false,
+      "name": "session_messaging_outbox_pk",
+      "table": "session_messaging_outbox",
+      "entityType": "pks"
+    },
+    {
+      "columns": ["session_id"],
+      "nameExplicit": false,
+      "name": "session_messaging_participation_pk",
+      "table": "session_messaging_participation",
       "entityType": "pks"
     },
     {
@@ -2792,6 +2916,42 @@
       "name": "session_message_time_created_idx",
       "entityType": "indexes",
       "table": "session_message"
+    },
+    {
+      "columns": [
+        {
+          "value": "request_id",
+          "isExpression": false
+        },
+        {
+          "value": "kind",
+          "isExpression": false
+        }
+      ],
+      "isUnique": true,
+      "where": null,
+      "origin": "manual",
+      "name": "session_messaging_outbox_request_kind_idx",
+      "entityType": "indexes",
+      "table": "session_messaging_outbox"
+    },
+    {
+      "columns": [
+        {
+          "value": "state",
+          "isExpression": false
+        },
+        {
+          "value": "inbox_id",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "session_messaging_outbox_state_idx",
+      "entityType": "indexes",
+      "table": "session_messaging_outbox"
     },
     {
       "columns": [

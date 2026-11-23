@@ -11,6 +11,7 @@ import type { Agent } from "@opencode/schema/agent"
 import { Cause, Clock, Data, Deferred, Effect, Exit, Fiber, Option, Stream } from "effect"
 import { SessionError } from "@opencode/schema/session-error"
 import { Bus } from "../../bus.js"
+import { Database } from "../../database/database.js"
 import { Permission } from "../../permission.js"
 import { Snapshot } from "../../snapshot.js"
 import { Tool } from "../../tool.js"
@@ -19,6 +20,7 @@ import { QuestionTool } from "../../tool/plugin/question.js"
 import { StepFailedError } from "../error.js"
 import { SessionEvent } from "../event.js"
 import { SessionMessage } from "../message.js"
+import { SessionMessagingProjection } from "../messaging/projection.js"
 import { SessionModelRequest } from "../model-request.js"
 import { SessionSchema } from "../schema.js"
 import { toSessionError } from "../to-session-error.js"
@@ -70,6 +72,7 @@ const RESULT_MISSING = { type: "tool.result-missing", message: "Provider did not
 /** Captures Location-scoped dependencies without introducing another service or execution loop. */
 export const make = Effect.gen(function* () {
   const bus = yield* Bus.Service
+  const { db } = yield* Database.Service
   const llm = yield* LLMClient.Service
   const snapshots = yield* Snapshot.Service
   const toolOutput = yield* ToolOutput.Service
@@ -287,6 +290,7 @@ export const make = Effect.gen(function* () {
         }
 
         const record = publisher.record()
+        const needsContinuation = input.prepared.request.toolChoice?.type !== "none" && record.needsContinuation
         if (record.finish || record.failure) {
           const startSnapshot = yield* Fiber.join(pendingStartSnapshot)
           const snapshot = yield* snapshots.capture()
@@ -301,17 +305,31 @@ export const make = Effect.gen(function* () {
           const usage = record.finish ? SessionUsage.record(record.finish.usage, input.model.cost) : undefined
           if (usage) yield* Effect.annotateCurrentSpan("opencode.usage.cost_usd", usage.cost)
           if (record.failure) yield* publisher.publishStepFailure({ ...usage, snapshot, files })
-          if (record.finish && usage && !record.failure)
-            yield* bus.publish(SessionEvent.Step.Ended, {
-              sessionID: input.sessionID,
-              assistantMessageID: yield* publisher.startAssistant(),
-              finish: record.finish.finish,
-              rawFinish: record.finish.rawFinish,
-              native: record.finish.native,
-              ...usage,
-              snapshot,
-              files,
-            })
+          if (record.finish && usage && !record.failure) {
+            const assistantMessageID = yield* publisher.startAssistant()
+            const final =
+              record.finish.finish === "stop" &&
+              !needsContinuation &&
+              Exit.isSuccess(stream) &&
+              !interrupted &&
+              !toolFailure
+            yield* bus.publish(
+              SessionEvent.Step.Ended,
+              {
+                sessionID: input.sessionID,
+                assistantMessageID,
+                finish: record.finish.finish,
+                rawFinish: record.finish.rawFinish,
+                native: record.finish.native,
+                ...usage,
+                snapshot,
+                files,
+              },
+              final
+                ? { commit: () => SessionMessagingProjection.complete(db, input.sessionID, assistantMessageID) }
+                : undefined,
+            )
+          }
         }
 
         if (llmError && retry?.retry && tools.declines.length === 0 && !tools.interrupted)
@@ -325,7 +343,6 @@ export const make = Effect.gen(function* () {
         if (tools.interrupted && tools.failure) return yield* Effect.failCause(tools.failure)
         if (tools.interrupted && Exit.isFailure(joined)) return yield* Effect.failCause(joined.cause)
         if (record.failure) return yield* new StepFailedError({ error: record.failure })
-        const needsContinuation = input.prepared.request.toolChoice?.type !== "none" && record.needsContinuation
         if (record.finish?.finish === "length") return Outcome.OutputLimit({ needsContinuation })
         return Outcome.Completed({ needsContinuation })
       }),

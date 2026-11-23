@@ -94,6 +94,11 @@ const Handlers = Runtime.handlers(Commands, {
   pair: () => import("./commands/handlers/pair"),
   reload: () => import("./commands/handlers/reload"),
   session: {
+    peers: () => import("./commands/handlers/session/messaging").then((module) => ({ default: module.peers })),
+    send: () => import("./commands/handlers/session/messaging").then((module) => ({ default: module.send })),
+    result: () => import("./commands/handlers/session/messaging").then((module) => ({ default: module.result })),
+    messaging: () =>
+      import("./commands/handlers/session/messaging").then((module) => ({ default: module.participation })),
     list: () => import("./commands/handlers/session/list"),
     delete: () => import("./commands/handlers/session/delete"),
     export: () => import("./commands/handlers/session/export"),

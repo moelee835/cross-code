@@ -4,6 +4,7 @@ import { useKeyboard, useRenderer } from "@opentui/solid"
 import { isDeepEqual } from "remeda"
 import { createSimpleContext } from "./helper"
 import { useClient } from "./client"
+import { registerOpenSessions } from "./session-messaging"
 import { locationKey, useData } from "./data"
 import { withTimestampedFallback } from "@opencode/util/session-title-fallback"
 import { useEvent } from "./event"
@@ -185,6 +186,12 @@ export const { use: useSessionTabs, provider: SessionTabsProvider } = createSimp
         renaming: data.session.title.pending(session),
       }
     }
+
+    const peerMessagingEnabled = registerOpenSessions(() => {
+      const viewed = route.data.type === "session" ? current() : undefined
+      const tabs = enabled() ? state().tabs.map((tab) => tab.sessionID) : []
+      return viewed ? [viewed, ...tabs] : tabs
+    })
 
     createProgramStatus({
       renderer,
@@ -385,6 +392,7 @@ export const { use: useSessionTabs, provider: SessionTabsProvider } = createSimp
 
     return {
       enabled,
+      peerMessagingEnabled,
       tabs() {
         return state().tabs
       },
