@@ -6,7 +6,7 @@ import { render, useTerminalDimensions } from "@opentui/solid"
 import { OPENCODE_VERSION } from "../version"
 import "@opencode/tui/component/spinner-renderable"
 import { SPINNER_FRAMES } from "@opencode/tui/component/spinner"
-import { go } from "@opencode/tui/logo"
+import { logoMark, productName } from "@opencode/tui/logo"
 import { setTimeout } from "node:timers/promises"
 import {
   batch,
@@ -22,7 +22,7 @@ import {
   untrack,
 } from "solid-js"
 
-const stages = ["Keeping your session safe", "Starting the new background service", "Loading OpenCode"] as const
+const stages = ["Keeping your session safe", "Starting the new background service", `Loading ${productName}`] as const
 const stageFloor = 480
 const transitionDuration = 420
 const completionHold = 650
@@ -187,7 +187,6 @@ const colors = {
   text: RGBA.fromHex("#eeeeee"),
 }
 
-const monogram = go.right.slice(1)
 const sweepBlend = 8
 const textDim = RGBA.fromHex("#4c4c4c")
 const rampSteps = 32
@@ -229,7 +228,7 @@ function Monogram(props: { ink: () => RGBA }) {
   })
   return (
     <box flexDirection="column">
-      <For each={monogram}>
+      <For each={logoMark}>
         {(line) => (
           <box flexDirection="row">
             <For each={Array.from(line)}>
@@ -327,7 +326,7 @@ function UpdateFooter(props: {
   const statusSweep = createSweep()
   const runningHeader = () =>
     phrase(
-      ["OpenCode", colors.muted, true],
+      [productName, colors.muted, true],
       ["is updating", colors.muted],
       ...(props.from
         ? ([
@@ -339,11 +338,11 @@ function UpdateFooter(props: {
       [OPENCODE_VERSION, colors.accent],
     )
   const completedHeader = phrase(
-    ["OpenCode", colors.muted, true],
+    [productName, colors.muted, true],
     ["updated to", colors.muted],
     [OPENCODE_VERSION, colors.accent],
   )
-  const pausedHeader = phrase(["OpenCode", colors.muted, true], ["update paused", colors.muted])
+  const pausedHeader = phrase([productName, colors.muted, true], ["update paused", colors.muted])
   const outcomeStatus = () =>
     props.outcome() === "success"
       ? [...styled("✓", colors.success), ...styled(" Ready", colors.text)]

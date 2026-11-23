@@ -3,7 +3,12 @@ import { For, type JSX } from "solid-js"
 import { useTerminalDimensions } from "@opentui/solid"
 import { useTheme } from "../context/theme"
 import { tint } from "../theme/color"
-import { go, logo } from "../logo"
+import { logo, logoMark } from "../logo"
+
+const leftWidth = logo.left[0].length
+const rightWidth = logo.right[0].length
+const stackedWidth = Math.max(leftWidth, rightWidth) + 3
+const horizontalWidth = leftWidth + rightWidth + 6
 
 export function Logo() {
   const theme = useTheme()
@@ -51,11 +56,9 @@ export function Logo() {
 
   return (
     <box>
-      {dimensions().height < 12 ? null : dimensions().width < 22 ? (
-        <For each={go.right.slice(1)}>
-          {(line) => <box flexDirection="row">{renderLine(line, theme.text.base, true)}</box>}
-        </For>
-      ) : dimensions().width < 44 ? (
+      {dimensions().height < 12 ? null : dimensions().width < stackedWidth ? (
+        <For each={logoMark}>{(line) => <box flexDirection="row">{renderLine(line, theme.text.base, true)}</box>}</For>
+      ) : dimensions().width < horizontalWidth ? (
         <>
           <For each={logo.left.slice(1)}>
             {(line) => <box flexDirection="row">{renderLine(line, theme.text.muted, false)}</box>}

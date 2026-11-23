@@ -5,6 +5,7 @@ import fcntl
 import json
 import os
 import pty
+import re
 import signal
 import struct
 import subprocess
@@ -30,17 +31,25 @@ def until(description, condition):
     raise AssertionError(f"Timed out waiting for {description}")
 
 
-def tui(binary, session, directory, env):
+def tui(binary, session, directory, env, logo_ready=None):
     pid, terminal = pty.fork()
     if pid == 0:
         os.chdir(directory)
-        os.execve(binary, [binary, "--session", session], env)
+        args = [binary, "--session", session] if session else [binary]
+        os.execve(binary, args, env)
     fcntl.ioctl(terminal, termios.TIOCSWINSZ, struct.pack("HHHH", 35, 110, 0, 0))
 
     def drain():
+        csi = re.compile(rb"\x1b\[[0-?]*[ -/]*[@-~]")
+        cross_logo = "▄█▀▀▀ ██▀█▄ ▄█▀█▄ ▄█▀▀▀ ▄█▀▀▀".encode()
+        tail = b""
         try:
-            while os.read(terminal, 4096):
-                pass
+            while chunk := os.read(terminal, 4096):
+                if logo_ready is not None and not logo_ready.is_set():
+                    output = tail + chunk
+                    if cross_logo in csi.sub(b"", output):
+                        logo_ready.set()
+                    tail = output[-4096:]
         except OSError:
             pass
 
@@ -143,6 +152,10 @@ def smoke(binary, root):
 
             until("bundled Gemini OAuth and Google API key options", google_methods_ready)
             print("The compiled CLI exposes both Google sign-in methods.")
+            logo_ready = threading.Event()
+            windows.append(tui(binary, None, root, env, logo_ready))
+            assert logo_ready.wait(45), "The Cross Code wordmark did not appear on the TUI home screen"
+            print("The compiled CLI renders the Cross Code home screen wordmark.")
             sender, recipient = create("Sender"), create("Recipient")
             for session in [sender, recipient]:
                 cli("session", "messaging", "--session", session, "--enable")
