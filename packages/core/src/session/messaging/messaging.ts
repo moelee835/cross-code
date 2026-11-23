@@ -16,6 +16,7 @@ import {
   type Result,
 } from "@opencode/schema/session-messaging"
 import { makeGlobalNode } from "@opencode/util/effect/app-node"
+import { FSUtil } from "@opencode/util/fs-util"
 import { Database } from "../../database/database.js"
 import { Bus } from "../../bus.js"
 import { SessionEvent } from "../event.js"
@@ -81,6 +82,7 @@ const layer = Layer.effect(
     const inbox = yield* SessionInbox.Service
     const execution = yield* SessionExecution.Service
     const policy = yield* SessionMessagingPolicy.Service
+    const fs = yield* FSUtil.Service
     const synthetic = SessionSynthetic.make(store, inbox, execution.wake)
     const pending = yield* Queue.sliding<void>(1)
     const started = yield* Latch.make()
@@ -92,7 +94,7 @@ const layer = Layer.effect(
     })
 
     const deliver = Effect.fnUntraced(function* (request: Request) {
-      if (!(yield* SessionMessagingPolicy.allowed(db, request.sender_session_id, request.recipient_session_id))) {
+      if (!(yield* SessionMessagingPolicy.allowed(fs, db, request.sender_session_id, request.recipient_session_id))) {
         yield* db
           .transaction(() =>
             Effect.gen(function* () {
@@ -253,11 +255,12 @@ const layer = Layer.effect(
         const sender = addresses.find((peer) => peer.id === sessionID)
         if (!sender) return yield* new Unavailable()
         const active = yield* execution.active
-        return addresses.flatMap((peer) =>
-          peer.id !== sessionID && SessionMessagingPolicy.sameProject(sender, peer)
-            ? [{ sessionID: peer.id, title: peer.title ?? peer.id, busy: active.has(peer.id) }]
-            : [],
+        const peers = yield* SessionMessagingPolicy.matchingProject(
+          fs,
+          sender,
+          addresses.filter((peer) => peer.id !== sessionID),
         )
+        return peers.map((peer) => ({ sessionID: peer.id, title: peer.title ?? peer.id, busy: active.has(peer.id) }))
       }),
       lease: Effect.fn("SessionMessaging.lease")(function* (input, id) {
         if (!policy.enabled) return yield* new Unavailable()
@@ -297,7 +300,7 @@ const layer = Layer.effect(
               if (
                 !open.has(senderSessionID) ||
                 !open.has(input.recipientSessionID) ||
-                !(yield* SessionMessagingPolicy.allowed(db, senderSessionID, input.recipientSessionID))
+                !(yield* SessionMessagingPolicy.allowed(fs, db, senderSessionID, input.recipientSessionID))
               )
                 return yield* new Unavailable()
               const pending = yield* db
@@ -361,7 +364,7 @@ const layer = Layer.effect(
                 .where(and(eq(table.id, requestID), eq(table.recipient_session_id, sessionID)))
                 .get()
                 .pipe(Effect.orDie)
-              if (!row || !(yield* SessionMessagingPolicy.allowed(db, row.sender_session_id, sessionID)))
+              if (!row || !(yield* SessionMessagingPolicy.allowed(fs, db, row.sender_session_id, sessionID)))
                 return yield* new Unavailable()
               if (row.status === "completed" && !row.assistant_message_id && row.result === input.text)
                 return result(row)
@@ -395,6 +398,7 @@ export const node = makeGlobalNode({
     SessionProjector.node,
     SessionExecution.node,
     SessionMessagingPolicy.node,
+    FSUtil.node,
   ],
 })
 

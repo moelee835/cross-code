@@ -58,6 +58,9 @@ def tui(binary, session, directory, env, logo_ready=None):
 
 
 def smoke(binary, root):
+    child = root / "src" / "feature"
+    child.mkdir(parents=True)
+    subprocess.run(["git", "init", "--quiet", str(root)], check=True, timeout=15)
     receiver_started = threading.Event()
     release_receiver = threading.Event()
     sender_done = "Independent sender response"
@@ -133,8 +136,8 @@ def smoke(binary, root):
                 with urllib.request.urlopen(request, timeout=5) as response:
                     return json.load(response)
 
-            def create(title):
-                body = {"title": title, "location": {"directory": str(root)}, "model": model_ref}
+            def create(title, directory):
+                body = {"title": title, "location": {"directory": str(directory)}, "model": model_ref}
                 return api("/api/session", "POST", body)["data"]["id"]
 
             def google_methods_ready():
@@ -156,10 +159,10 @@ def smoke(binary, root):
             windows.append(tui(binary, None, root, env, logo_ready))
             assert logo_ready.wait(45), "The Cross Code wordmark did not appear on the TUI home screen"
             print("The compiled CLI renders the Cross Code home screen wordmark.")
-            sender, recipient = create("Sender"), create("Recipient")
-            for session in [sender, recipient]:
+            sender, recipient = create("Sender", root), create("Recipient", child)
+            for session, directory in [(sender, root), (recipient, child)]:
                 cli("session", "messaging", "--session", session, "--enable")
-                windows.append(tui(binary, session, root, env))
+                windows.append(tui(binary, session, directory, env))
 
             path = "/api/experimental/session-messaging/sessions"
 
@@ -171,7 +174,7 @@ def smoke(binary, root):
                         raise
                     return False
 
-            until("two open TUI sessions", peer_visible)
+            until("two open TUI sessions in the root and a subdirectory", peer_visible)
             receipt = json.loads(cli("session", "send", "--from", sender, "--to", recipient, "--text", peer_task, "--json"))
             assert receipt["status"] == "accepted"
             assert receiver_started.wait(45), "The peer's first model request did not start"

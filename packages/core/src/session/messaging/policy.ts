@@ -2,10 +2,14 @@ export * as SessionMessagingPolicy from "./policy.js"
 
 import { and, eq, inArray, isNull } from "drizzle-orm"
 import { Clock, Context, Data, Effect, Layer } from "effect"
-import { Project } from "@opencode/schema/project"
+import { isAbsolute } from "node:path"
 import { SessionMessaging } from "@opencode/schema/session-messaging"
 import { makeGlobalNode } from "@opencode/util/effect/app-node"
+import type { FSUtil } from "@opencode/util/fs-util"
+import { sameDirectory } from "@opencode/util/path"
 import { Database } from "../../database/database.js"
+import { Project } from "../../project.js"
+import { AbsolutePath } from "../../schema.js"
 import type { SessionSchema } from "../schema.js"
 import type { SessionMessage } from "../message.js"
 import {
@@ -113,18 +117,48 @@ export const participating = (db: DB, ids: ReadonlyArray<ID>) =>
     .pipe(Effect.orDie)
 
 type Address = { readonly directory: string; readonly project: Project.ID }
-export const sameProject = (first: Address, second: Address) =>
-  first.project === second.project && (first.project !== Project.ID.global || first.directory === second.directory)
 
-export const allowed = Effect.fnUntraced(function* (db: DB, sender: ID, recipient: ID) {
+const repositoryRoot = Effect.fnUntraced(function* (fs: FSUtil.Interface, directory: string) {
+  if (!isAbsolute(directory)) return undefined
+  const canonical = yield* fs.realPath(directory).pipe(Effect.orElseSucceed(() => undefined))
+  if (canonical === undefined) return undefined
+  return yield* Project.root(fs, AbsolutePath.make(canonical))
+})
+
+export const matchingProject = Effect.fnUntraced(function* <A extends Address>(
+  fs: FSUtil.Interface,
+  sender: Address,
+  candidates: ReadonlyArray<A>,
+) {
+  const peers = candidates.filter((peer) => peer.project === sender.project)
+  if (sender.project !== Project.ID.global || peers.every((peer) => peer.directory === sender.directory)) return peers
+
+  // Repositories without a stable project ID share "global". Use the nearest
+  // repository marker so independently initialized nested repositories stay separate.
+  const root = yield* repositoryRoot(fs, sender.directory)
+  return yield* Effect.filter(
+    peers,
+    (peer) =>
+      Effect.gen(function* () {
+        if (peer.directory === sender.directory) return true
+        if (root === undefined) return false
+        const candidate = yield* repositoryRoot(fs, peer.directory)
+        return candidate !== undefined && sameDirectory(root, candidate)
+      }),
+    { concurrency: 8 },
+  )
+})
+
+export const allowed = Effect.fnUntraced(function* (fs: FSUtil.Interface, db: DB, sender: ID, recipient: ID) {
   if (sender === recipient) return false
   const [first, second] = yield* participating(db, [sender, recipient])
-  return first !== undefined && second !== undefined && sameProject(first, second)
+  if (first === undefined || second === undefined) return false
+  return (yield* matchingProject(fs, first, [second])).length > 0
 })
 
 export class Revoked extends Data.TaggedError("SessionMessaging.Revoked") {}
 
-export const guardPromotion = Effect.fnUntraced(function* (db: DB, inboxID: SessionMessage.ID, enabled: boolean) {
+export const guardPromotion = Effect.fnUntraced(function* (db: DB, inboxID: SessionMessage.ID, fs?: FSUtil.Interface) {
   const requests = SessionMessagingRequestTable
   const outbox = SessionMessagingOutboxTable
   const request = yield* db
@@ -134,7 +168,7 @@ export const guardPromotion = Effect.fnUntraced(function* (db: DB, inboxID: Sess
     .get()
     .pipe(Effect.orDie)
   if (request) {
-    if (!enabled || !(yield* allowed(db, request.sender, request.recipient))) return yield* Effect.die(new Revoked())
+    if (!fs || !(yield* allowed(fs, db, request.sender, request.recipient))) return yield* Effect.die(new Revoked())
     return
   }
   const notification = yield* db
@@ -144,6 +178,6 @@ export const guardPromotion = Effect.fnUntraced(function* (db: DB, inboxID: Sess
     .where(eq(outbox.inbox_id, inboxID))
     .get()
     .pipe(Effect.orDie)
-  if (notification && (!enabled || !(yield* participating(db, [notification.sender])).length))
+  if (notification && (!fs || !(yield* participating(db, [notification.sender])).length))
     return yield* Effect.die(new Revoked())
 })

@@ -26,6 +26,7 @@ import { toSessionError } from "../to-session-error.js"
 import { DrainResult, Service, type Interface } from "./index.js"
 import { Snapshot } from "../../snapshot.js"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
+import { FSUtil } from "@opencode/util/fs-util"
 import { llmClient } from "../../effect/app-node-platform.js"
 import { StepFailedError } from "../error.js"
 import { SessionRunnerRetry } from "./retry.js"
@@ -58,6 +59,7 @@ const layer = Layer.effect(
     const steps = yield* SessionStep.make
     const pty = yield* PersistentPty.Service
     const messaging = yield* SessionMessagingPolicy.Service
+    const fs = yield* FSUtil.Service
     // Title generation starts once input is visible and must not delay model execution.
     const titles = yield* FiberMap.make<SessionSchema.ID, void, never>()
 
@@ -198,7 +200,7 @@ const layer = Layer.effect(
                     bus,
                     sessionID,
                     entering && !continuing ? promotable : "steer",
-                    messaging.enabled,
+                    messaging.enabled ? fs : undefined,
                   )
                   // A control admitted during context preparation owns this boundary.
                   if (promoted === undefined || promoted === "revoked") return undefined
@@ -299,6 +301,7 @@ const layer = Layer.effect(
           isLocationClosed: lifecycle.isClosed,
           interruption,
           handoffPrepared: pty.handoffPrepared,
+          peerFileSystem: fs,
           sessionID,
           assistantMessageID,
           agent: loaded.agent.id,
@@ -470,5 +473,6 @@ export const node = makeLocationNode({
     ToolOutput.node,
     Database.node,
     SessionMessagingPolicy.node,
+    FSUtil.node,
   ],
 })

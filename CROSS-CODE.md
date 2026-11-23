@@ -11,7 +11,7 @@ cross-code service set env OPENCODE_FLAGS session_messaging
 cross-code service restart
 ```
 
-Open two sessions in the same project using the default managed service. Run `/peer-messaging` in each session to opt in. The feature is available on an authenticated loopback service with remote access disabled. Closing a session removes it from discovery. Completed results for a closed sender remain recorded and are delivered when the sender reopens.
+Open two sessions in the same project using the default managed service. A Git repository's root and its subdirectories can share peers as soon as you run `git init`. A separately initialized nested repository has its own peers. Run `/peer-messaging` in each session to opt in. The feature is available on an authenticated loopback service with remote access disabled. Closing a session removes it from discovery. Completed results for a closed sender remain recorded and are delivered when the sender reopens.
 
 ## Connect a Gemini model
 

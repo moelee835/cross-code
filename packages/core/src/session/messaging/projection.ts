@@ -2,6 +2,7 @@ export * as SessionMessagingProjection from "./projection.js"
 
 import { and, asc, eq, gte, inArray, ne } from "drizzle-orm"
 import { Effect } from "effect"
+import type { FSUtil } from "@opencode/util/fs-util"
 import type { Database } from "../../database/database.js"
 import { SessionMessage } from "../message.js"
 import type { SessionSchema } from "../schema.js"
@@ -131,6 +132,7 @@ function settleOutbox(db: DB, ref: InboxRef) {
 }
 
 export const complete = Effect.fnUntraced(function* (
+  fs: FSUtil.Interface,
   db: DB,
   sessionID: SessionSchema.ID,
   assistantMessageID: SessionMessage.ID,
@@ -142,7 +144,7 @@ export const complete = Effect.fnUntraced(function* (
     .get()
     .pipe(Effect.orDie)
   if (!request) return
-  if (!(yield* SessionMessagingPolicy.allowed(db, request.sender, sessionID)))
+  if (!(yield* SessionMessagingPolicy.allowed(fs, db, request.sender, sessionID)))
     return yield* failRunning(db, sessionID, "cancelled")
   const parts = yield* db
     .select({ data: SessionPartTable.data })
