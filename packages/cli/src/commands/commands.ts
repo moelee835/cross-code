@@ -476,7 +476,7 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
           description: "List open sessions participating in peer messaging",
           params: {
             from: Flag.String("from").pipe(Flag.withDescription("Sending session ID")),
-            json: Flag.Boolean("json"),
+            json: Flag.Boolean("json").pipe(Flag.withDefault(false)),
           },
         }),
         Spec.make("send", {
@@ -486,7 +486,7 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
             to: Flag.String("to"),
             text: Flag.String("text"),
             key: Flag.String("key").pipe(Flag.optional, Flag.withDescription("Retry key to reuse for this request")),
-            json: Flag.Boolean("json"),
+            json: Flag.Boolean("json").pipe(Flag.withDefault(false)),
           },
         }),
         Spec.make("result", {
@@ -494,16 +494,16 @@ const Root = Spec.make(typeof OPENCODE_CLI_NAME === "string" ? OPENCODE_CLI_NAME
           params: {
             from: Flag.String("from"),
             requestID: Argument.String("requestID"),
-            json: Flag.Boolean("json"),
+            json: Flag.Boolean("json").pipe(Flag.withDefault(false)),
           },
         }),
         Spec.make("messaging", {
           description: "Read or change a session's participation in peer messaging",
           params: {
             sessionID: Flag.String("session"),
-            enable: Flag.Boolean("enable"),
-            disable: Flag.Boolean("disable"),
-            json: Flag.Boolean("json"),
+            enable: Flag.Boolean("enable").pipe(Flag.withDefault(false)),
+            disable: Flag.Boolean("disable").pipe(Flag.withDefault(false)),
+            json: Flag.Boolean("json").pipe(Flag.withDefault(false)),
           },
         }),
         Spec.make("list", {

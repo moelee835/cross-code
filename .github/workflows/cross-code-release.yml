@@ -30,6 +30,7 @@ jobs:
   build:
     if: github.repository == 'moelee835/cross-code'
     strategy:
+      fail-fast: false
       matrix:
         include:
           - runner: macos-15
@@ -47,7 +48,7 @@ jobs:
         with:
           bun-version-file: package.json
       - run: bun install --frozen-lockfile
-      - name: Build and verify the CLI
+      - name: Build the CLI
         shell: bash
         run: |
           if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
@@ -56,10 +57,17 @@ jobs:
             export OPENCODE_VERSION="0.0.0-cross-code-$GITHUB_RUN_NUMBER"
           fi
           bun run --cwd packages/cli script/build.ts --skip-install --skip-web-ui
+      - name: Verify the CLI and two TUI sessions
+        shell: bash
+        run: |
           binary="packages/cli/dist/cli-$OPENCODE_TARGET/bin/cross-code"
           "$binary" --version
           "$binary" session send --help
           python3 script/test-cross-code.py "$binary"
+      - name: Pack the CLI
+        shell: bash
+        run: |
+          binary="packages/cli/dist/cli-$OPENCODE_TARGET/bin/cross-code"
           mkdir -p artifacts
           tar -czf "artifacts/cross-code-$OPENCODE_TARGET.tar.gz" -C "$(dirname "$binary")" cross-code
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
