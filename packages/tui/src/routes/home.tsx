@@ -22,7 +22,7 @@ const placeholder = {
   shell: ["ls -la", "git status", "pwd"],
 }
 
-export function Home() {
+export function Home(props: { tour?: { visible: () => boolean; open: () => void; dismiss: () => void } }) {
   const route = useRouteData("home")
   const promptRef = usePromptRef()
   const [ref, setRef] = createSignal<PromptRef | undefined>()
@@ -32,6 +32,7 @@ export function Home() {
   const data = useData()
   const location = useLocation()
   const dimensions = useTerminalDimensions()
+  const theme = useTheme()
   const [logoWidth, setLogoWidth] = createSignal(0)
   // Global MCP elicitations can arrive without a session route, so keep them reachable from Home.
   const currentLocation = () => route.location ?? data.location.default()
@@ -101,6 +102,18 @@ export function Home() {
         <box width="100%" maxWidth={75} zIndex={1000} paddingTop={1} flexShrink={0} position="relative">
           <Prompt ref={bind} placeholders={placeholder} disabled={forms().length > 0} />
         </box>
+        <Show when={props.tour && props.tour.visible() && forms().length === 0 ? props.tour : undefined}>
+          {(tour) => (
+            <box flexDirection="row" gap={2} paddingTop={1} flexShrink={0}>
+              <text fg={theme.text.action.primary.selected} onMouseUp={tour().open}>
+                Start here · /tour
+              </text>
+              <text fg={theme.text.muted} onMouseUp={tour().dismiss}>
+                ×
+              </text>
+            </box>
+          )}
+        </Show>
         <box flexGrow={1} minHeight={0} />
       </box>
       <box width="100%" flexShrink={0}>

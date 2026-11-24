@@ -13,6 +13,10 @@ cross-code service restart
 
 Open two sessions in the same project using the default managed service. A Git repository's root and its subdirectories can share peers as soon as you run `git init`. A separately initialized nested repository has its own peers. Run `/peer-messaging` in each session to opt in. The feature is available on an authenticated loopback service with remote access disabled. Closing a session removes it from discovery. Completed results for a closed sender remain recorded and are delivered when the sender reopens.
 
+## Take the product tour
+
+Open `/tour`, or press `t` in `/help`. The tour guides you through connecting a model, filling the prompt composer with an example, and trying peer messaging. You decide when to send a prompt. If no peer is available, select **Example** to preview how a request and reply work.
+
 ## Update Cross Code
 
 GitHub Actions validates pull requests targeting `dev`. A push to `dev` builds and tests the Linux x64 and macOS arm64 binaries, then publishes both archives and `SHA256SUMS` as a public prerelease. Automated versions use `0.1.1-dev.<run number>`. Maintainers can also publish an explicitly versioned `cross-code-v*` tag. [Cross Code CI and release](https://github.com/moelee835/cross-code/actions/workflows/cross-code-release.yml)

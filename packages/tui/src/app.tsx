@@ -88,6 +88,7 @@ import { clickedLink } from "./ui/link"
 import { ThemeErrorToast } from "./component/theme-error-toast"
 import { createThemeSource, ThemeProvider, useTheme, useThemes } from "./context/theme"
 import { Home } from "./routes/home"
+import { createProductTour } from "./context/product-tour"
 import { PromptHistoryProvider } from "./prompt/history"
 import { FrecencyProvider } from "./prompt/frecency"
 import { PromptStashProvider } from "./prompt/stash"
@@ -768,6 +769,22 @@ function App() {
   })
 
   const connected = useConnected()
+  const tour = Brand.crossCode
+    ? createProductTour({
+        invite:
+          !args.prompt &&
+          !args.continue &&
+          !args.sessionID &&
+          !args.newSessionID &&
+          !process.env.OPENCODE_DRIVE &&
+          !process.env.OPENCODE_STORY &&
+          !process.env.OPENCODE_ROUTE &&
+          !existsSync(path.join(paths.state, "prompt-history.jsonl")),
+        connected,
+        peerMessagingEnabled: sessionTabs.peerMessagingEnabled,
+        connect: () => keymap.dispatch("provider.connect"),
+      })
+    : undefined
   const appCommands = createMemo(() =>
     [
       {
@@ -1208,10 +1225,21 @@ function App() {
         title: "Help",
         slash: { name: "help" },
         run: () => {
-          dialog.replace(() => <DialogHelp />)
+          dialog.replace(() => <DialogHelp openTour={tour?.open} />)
         },
         category: "System",
       },
+      ...(tour
+        ? [
+            {
+              name: "cross-code.tour",
+              title: "Open the product tour",
+              slash: { name: "tour" },
+              run: tour.open,
+              category: "System",
+            },
+          ]
+        : []),
       {
         name: "docs.open",
         title: "Open docs",
@@ -1488,7 +1516,7 @@ function App() {
               </Show>
               <Switch>
                 <Match when={route.data.type === "home"}>
-                  <Home />
+                  <Home tour={tour} />
                 </Match>
                 <Match when={route.data.type === "session"}>
                   <Show when={route.data.type === "session" ? route.data.sessionID : undefined} keyed>

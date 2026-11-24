@@ -1,8 +1,9 @@
+import { Show } from "solid-js"
 import { Keymap } from "../context/keymap"
 import { useTheme } from "../context/theme"
 import { DialogHeader, DialogLayout, useDialog } from "./dialog"
 
-export function DialogHelp() {
+export function DialogHelp(props: { openTour?: () => void }) {
   const dialog = useDialog()
   const theme = useTheme().surface("dialog")
   const shortcuts = Keymap.useShortcuts()
@@ -12,6 +13,7 @@ export function DialogHelp() {
     commands: [
       { bind: "return", title: "Close help", group: "Dialog", run: () => dialog.clear() },
       { bind: "escape", title: "Close help", group: "Dialog", run: () => dialog.clear() },
+      ...(props.openTour ? [{ bind: "t", title: "Open product tour", group: "Dialog", run: props.openTour }] : []),
     ],
   }))
 
@@ -35,6 +37,13 @@ export function DialogHelp() {
       <text fg={theme.text.muted}>
         Press {shortcuts.get("command.palette.show")} to see all available actions and commands in any context.
       </text>
+      <Show when={props.openTour}>
+        {(open) => (
+          <text fg={theme.text.action.primary.selected} onMouseUp={open()}>
+            Product tour · press t
+          </text>
+        )}
+      </Show>
     </DialogLayout>
   )
 }

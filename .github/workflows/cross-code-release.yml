@@ -38,6 +38,8 @@ jobs:
         working-directory: packages/client
       - run: bun test test/cross-code-update.test.ts
         working-directory: packages/cli
+      - run: bun test --timeout 30000 test/component/dialog-product-tour.test.tsx
+        working-directory: packages/tui
 
   version:
     if: github.repository == 'moelee835/cross-code'
