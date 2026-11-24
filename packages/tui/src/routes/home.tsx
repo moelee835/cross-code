@@ -22,7 +22,9 @@ const placeholder = {
   shell: ["ls -la", "git status", "pwd"],
 }
 
-export function Home(props: { tour?: { visible: () => boolean; open: () => void; dismiss: () => void } }) {
+export function Home(props: {
+  tour?: { visible: () => boolean; homeLabel: () => string; open: () => void; dismiss: () => void }
+}) {
   const route = useRouteData("home")
   const promptRef = usePromptRef()
   const [ref, setRef] = createSignal<PromptRef | undefined>()
@@ -106,7 +108,7 @@ export function Home(props: { tour?: { visible: () => boolean; open: () => void;
           {(tour) => (
             <box flexDirection="row" gap={2} paddingTop={1} flexShrink={0}>
               <text fg={theme.text.action.primary.selected} onMouseUp={tour().open}>
-                Start here · /tour
+                {tour().homeLabel()}
               </text>
               <text fg={theme.text.muted} onMouseUp={tour().dismiss}>
                 ×

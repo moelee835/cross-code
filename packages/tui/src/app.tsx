@@ -89,6 +89,7 @@ import { ThemeErrorToast } from "./component/theme-error-toast"
 import { createThemeSource, ThemeProvider, useTheme, useThemes } from "./context/theme"
 import { Home } from "./routes/home"
 import { createProductTour } from "./context/product-tour"
+import { tourCopy } from "./util/product-tour-copy"
 import { PromptHistoryProvider } from "./prompt/history"
 import { FrecencyProvider } from "./prompt/frecency"
 import { PromptStashProvider } from "./prompt/stash"
@@ -1225,7 +1226,7 @@ function App() {
         title: "Help",
         slash: { name: "help" },
         run: () => {
-          dialog.replace(() => <DialogHelp openTour={tour?.open} />)
+          dialog.replace(() => <DialogHelp openTour={tour?.open} tourLabel={tour && tourCopy[tour.language()].help} />)
         },
         category: "System",
       },
@@ -1233,7 +1234,7 @@ function App() {
         ? [
             {
               name: "cross-code.tour",
-              title: "Open the product tour",
+              title: tourCopy[tour.language()].open,
               slash: { name: "tour" },
               run: tour.open,
               category: "System",

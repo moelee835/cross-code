@@ -11,11 +11,11 @@ cross-code service set env OPENCODE_FLAGS session_messaging
 cross-code service restart
 ```
 
-Open two sessions in the same project using the default managed service. A Git repository's root and its subdirectories can share peers as soon as you run `git init`. A separately initialized nested repository has its own peers. Run `/peer-messaging` in each session to opt in. The feature is available on an authenticated loopback service with remote access disabled. Closing a session removes it from discovery. Completed results for a closed sender remain recorded and are delivered when the sender reopens.
+Open two sessions in the same project using the default managed service. A Git repository's root and its subdirectories can share peers as soon as you run `git init`. A separately initialized nested repository has its own peers. Send a first prompt in each new session to create it, then run `/peer-messaging` in both sessions to opt in. The feature is available on an authenticated loopback service with remote access disabled. Closing a session removes it from discovery. Completed results for a closed sender remain recorded and are delivered when the sender reopens.
 
 ## Take the product tour
 
-Open `/tour`, or press `t` in `/help`. The tour guides you through connecting a model, filling the prompt composer with an example, and trying peer messaging. You decide when to send a prompt. If no peer is available, select **Example** to preview how a request and reply work.
+Open `/tour`, or press `t` in `/help`. Select **한국어** or **English**, or press `l` to switch the tour language. Cross Code remembers your choice locally. The tour guides you through connecting a model, filling the prompt composer with an example, and trying peer messaging. You decide when to send a prompt. If no peer is available, select **Example** to preview how a request and reply work.
 
 ## Update Cross Code
 
