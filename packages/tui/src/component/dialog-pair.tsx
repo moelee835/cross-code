@@ -1,3 +1,4 @@
+import { Brand } from "@opencode/util/brand"
 import { TextAttributes } from "@opentui/core"
 import { useTerminalDimensions } from "@opentui/solid"
 import { createMemo, createResource, createSignal, For, Show } from "solid-js"
@@ -68,7 +69,7 @@ export function DialogPair() {
           </box>
           <Show when={value.loopback}>
             <text fg={theme.text.muted} wrapMode="word">
-              Run `opencode service set hostname 0.0.0.0` to access the service remotely.
+              Run `{Brand.command} service set hostname 0.0.0.0` to access the service remotely.
             </text>
           </Show>
         </box>

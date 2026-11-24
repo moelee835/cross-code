@@ -7,7 +7,7 @@
     </picture>
   </a>
 </p>
-<p align="center"><strong>Cross Code</strong> adds asynchronous messaging between OpenCode coding sessions.</p>
+<p align="center"><strong>Cross Code</strong> is an OpenCode-based coding agent with asynchronous messaging between sessions.</p>
 <p align="center">
   <a href="https://github.com/moelee835/cross-code/issues"><img alt="Issues" src="https://img.shields.io/github/issues/moelee835/cross-code?style=flat-square" /></a>
   <a href="https://github.com/moelee835/cross-code/releases"><img alt="Cross Code release" src="https://img.shields.io/github/v/release/moelee835/cross-code?include_prereleases&style=flat-square" /></a>

@@ -1,3 +1,4 @@
+import { Brand } from "@opencode/util/brand"
 import { existsSync } from "fs"
 import path from "path"
 import { render, useRenderer, useTerminalDimensions } from "@opentui/solid"
@@ -1109,7 +1110,7 @@ function App() {
         ? [
             {
               name: "opencode.update",
-              title: "Update OpenCode",
+              title: `Update ${Brand.name}`,
               slash: { name: "update" },
               run: () => updater.open?.("manual"),
               category: "System",
@@ -1215,7 +1216,7 @@ function App() {
         name: "docs.open",
         title: "Open docs",
         run: () => {
-          openUrl("https://opencode.ai/docs").catch(() => {})
+          openUrl(Brand.documentation).catch(() => {})
           dialog.clear()
         },
         category: "System",

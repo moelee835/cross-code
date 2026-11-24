@@ -13,6 +13,7 @@ import { hasPersistentPtyConnectTicketURL } from "@opencode/protocol/groups/pers
 import { hasMcpClientTicketURL } from "@opencode/protocol/groups/mcp"
 import { isMachineLinkUpgrade } from "@opencode/protocol/groups/machine"
 import { isPairingConnectURL } from "@opencode/protocol/groups/server"
+import { Brand } from "@opencode/util/brand"
 import { Global } from "@opencode/util/global"
 import { Cause, Context, Effect, Exit, Latch, Layer, Option, Ref, Scope } from "effect"
 import { HttpMiddleware, HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http"
@@ -264,7 +265,7 @@ function unavailable(status: Status.State) {
       {
         code: "service_failed",
         message: "The background service could not start.",
-        action: "Run `opencode service restart` after checking the service logs.",
+        action: `Run \`${Brand.command} service restart\` after checking the service logs.`,
       },
       { status: 503 },
     )

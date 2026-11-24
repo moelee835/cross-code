@@ -6,12 +6,11 @@ import { Context, Effect, Layer } from "effect"
 // The variants resolve through the `workerd` bundle condition, like the
 // native-module stubs, so no runtime sniffing happens here.
 import { roots } from "#global-roots"
+import { Brand } from "./brand.js"
 import { Flock } from "./flock.js"
 import { makeGlobalNode } from "./effect/app-node.js"
 
-declare const CROSS_CODE_BUILD: boolean | undefined
-const app = typeof CROSS_CODE_BUILD === "boolean" && CROSS_CODE_BUILD ? "cross-code" : "opencode"
-const { data, cache, config, state, tmp } = roots(app)
+const { data, cache, config, state, tmp } = roots(Brand.command)
 
 const paths = {
   get home() {

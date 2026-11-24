@@ -1,5 +1,6 @@
 export * as PluginInternal from "./internal.js"
 
+import { Brand } from "@opencode/util/brand"
 import { LLMClient } from "@opencode/ai/effect"
 import type { Plugin } from "@opencode/plugin/effect/plugin"
 import { LayerNode } from "@opencode/util/effect/layer-node"
@@ -131,8 +132,6 @@ import { VerbosityPlugin } from "./verbosity.js"
 import { WarmingPlugin } from "./warming.js"
 import { WellKnownPlugin } from "../wellknown/plugin.js"
 import { PluginModule } from "./module.js"
-
-declare const CROSS_CODE_BUILD: boolean | undefined
 
 const services = [
   Agent.Service,
@@ -366,7 +365,7 @@ export const list = Effect.fn("PluginInternal.list")(function* () {
         }) satisfies Generation,
     )
   return {
-    pre: resolve(typeof CROSS_CODE_BUILD === "boolean" && CROSS_CODE_BUILD ? [...pre, geminiAuth] : pre),
+    pre: resolve(Brand.crossCode ? [...pre, geminiAuth] : pre),
     post: resolve(post),
   }
 })

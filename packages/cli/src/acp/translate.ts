@@ -1,3 +1,4 @@
+import { Brand } from "@opencode/util/brand"
 import type { PromptResponse, SessionUpdate } from "@agentclientprotocol/sdk"
 import type { OpenCodeEvent } from "@opencode/client/effect"
 import type { Session } from "@opencode/schema/session"
@@ -156,7 +157,7 @@ export function failure(state: TurnState) {
   if (error?.type === "provider.auth") return new ACPError.AuthRequiredError()
   if (error && error.type !== "aborted" && error.type !== "provider.content-filter") {
     return new ACPError.ServiceFailureError({
-      safeMessage: error.message || "OpenCode prompt failed",
+      safeMessage: error.message || `${Brand.name} prompt failed`,
       service: "session",
       errorName: error.type,
     })

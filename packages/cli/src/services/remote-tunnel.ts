@@ -1,5 +1,6 @@
 export * as RemoteTunnel from "./remote-tunnel"
 
+import { Brand } from "@opencode/util/brand"
 import type { OpenTunnelError } from "@opentunnel/client/effect"
 import { Cause, Effect, Schedule } from "effect"
 import { EOL } from "os"
@@ -42,7 +43,9 @@ export const run = Effect.fnUntraced(function* (input: {
     Effect.catchCause((cause) =>
       Cause.hasInterruptsOnly(cause)
         ? Effect.failCause(cause)
-        : Effect.logError("remote access tunnel stopped; run `opencode service set remote true` to retry", { cause }),
+        : Effect.logError(`remote access tunnel stopped; run \`${Brand.command} service set remote true\` to retry`, {
+            cause,
+          }),
     ),
   )
 })
@@ -60,7 +63,8 @@ export const ensure = Effect.fnUntraced(function* () {
     Effect.provide(OpenTunnelClient.layer()),
     Effect.timeoutOrElse({
       duration: "5 minutes",
-      orElse: () => Effect.fail(new Error("Timed out creating the remote access tunnel; run the command again to resume")),
+      orElse: () =>
+        Effect.fail(new Error("Timed out creating the remote access tunnel; run the command again to resume")),
     }),
   )
 })

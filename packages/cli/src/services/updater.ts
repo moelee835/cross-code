@@ -1,3 +1,4 @@
+import { Brand } from "@opencode/util/brand"
 import { Global } from "@opencode/util/global"
 import { AppProcess } from "@opencode/util/process"
 import { EffectFlock } from "@opencode/util/effect-flock"
@@ -666,7 +667,7 @@ const make = Effect.gen(function* () {
       yield* Effect.logInfo("update check done", { action: "up-to-date" })
       return undefined
     }
-    yield* Effect.logInfo("OpenCode update available", { current, latest: version, action: next })
+    yield* Effect.logInfo(`${Brand.name} update available`, { current, latest: version, action: next })
     return { policy, version }
   })
 
@@ -703,7 +704,7 @@ const make = Effect.gen(function* () {
     if (OPENCODE_LOCAL)
       return {
         type: "unavailable" as const,
-        message: "This build runs from a source checkout. Use an installed OpenCode release to check for updates.",
+        message: `This build runs from a source checkout. Use an installed ${Brand.name} release to check for updates.`,
       }
     if (CROSS_CODE) {
       const { version } = yield* crossRelease()

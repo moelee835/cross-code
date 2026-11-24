@@ -1,12 +1,15 @@
 export * as CommandPlugin from "./command.js"
 
 import { define } from "@opencode/plugin/effect/plugin"
+import { Brand } from "@opencode/util/brand"
 import { Effect, Stream } from "effect"
 import { Bus } from "../bus.js"
 import { Location } from "../location.js"
 import { Mcp } from "../mcp/index.js"
 import PROMPT_INITIALIZE from "./command/initialize.txt"
 import PROMPT_REVIEW from "./command/review.txt"
+
+const initializePrompt = PROMPT_INITIALIZE.replaceAll("${PRODUCT_NAME}", Brand.name)
 
 export const Plugin = define({
   id: "opencode.command",
@@ -34,7 +37,7 @@ export const Plugin = define({
             .prompt({
               ...input.prompt,
               sessionID: input.sessionID,
-              text: append(PROMPT_INITIALIZE.replace("${path}", location.project.directory), input.prompt.text),
+              text: append(initializePrompt.replace("${path}", location.project.directory), input.prompt.text),
               delivery: input.delivery,
             })
             .pipe(Effect.asVoid),

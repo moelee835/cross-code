@@ -1,6 +1,6 @@
-declare const CROSS_CODE_BUILD: boolean | undefined
+import { Brand } from "@opencode/util/brand"
 
-const crossCode = typeof CROSS_CODE_BUILD === "boolean" && CROSS_CODE_BUILD
+export { command as binaryName, initials as productInitials, name as productName } from "@opencode/util/brand"
 
 const openCodeLogo = {
   left: ["                   ", "█▀▀█ █▀▀█ █▀▀█ █▀▀▄", "█__█ █__█ █^^^ █__█", "▀▀▀▀ █▀▀▀ ▀▀▀▀ ▀~~▀"],
@@ -22,8 +22,5 @@ export const go = {
   right: ["    ", "█▀▀█", "█__█", "▀▀▀▀"],
 }
 
-export const logo = crossCode ? crossCodeLogo : openCodeLogo
-export const logoMark = crossCode ? ["▄█▀▀▀", "██   ", "▀█▄▄▄"] : go.right.slice(1)
-export const productName = crossCode ? "Cross Code" : "OpenCode"
-export const productInitials = crossCode ? "CC" : "OC"
-export const binaryName = crossCode ? "cross-code" : "opencode"
+export const logo = Brand.crossCode ? crossCodeLogo : openCodeLogo
+export const logoMark = Brand.crossCode ? ["▄█▀▀▀", "██   ", "▀█▄▄▄"] : go.right.slice(1)

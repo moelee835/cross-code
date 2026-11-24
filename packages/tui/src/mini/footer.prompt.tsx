@@ -5,6 +5,7 @@
 // It produces a PromptState that RunPromptBody renders as a slim single-line
 // composer while the footer view renders any active menus below it.
 /** @jsxImportSource @opentui/solid */
+import { Brand } from "@opencode/util/brand"
 import {
   StyledText,
   decodePasteBytes,
@@ -529,7 +530,8 @@ export function createPromptState(input: PromptInput): PromptState {
         description: "compact older session context to free space",
       } satisfies SlashOption,
       ...EXIT_COMMANDS.map(
-        (name) => ({ kind: "slash", name, display: `/${name}`, description: "close OpenCode" }) satisfies SlashOption,
+        (name) =>
+          ({ kind: "slash", name, display: `/${name}`, description: `close ${Brand.name}` }) satisfies SlashOption,
       ),
     ]
     const hidden = new Set(builtins.map((item) => item.name))

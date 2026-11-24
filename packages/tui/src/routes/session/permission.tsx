@@ -1,3 +1,4 @@
+import { Brand } from "@opencode/util/brand"
 import { createStore } from "solid-js/store"
 import { createMemo, For, Match, Show, Switch } from "solid-js"
 import { Portal, useRenderer, useTerminalDimensions, type JSX } from "@opentui/solid"
@@ -325,7 +326,7 @@ function RejectPrompt(props: {
           <text fg={theme.text.base}>Reject permission</text>
         </box>
         <box paddingLeft={1}>
-          <text fg={theme.text.muted}>Tell OpenCode what to do differently</text>
+          <text fg={theme.text.muted}>Tell {Brand.name} what to do differently</text>
         </box>
       </box>
       <box

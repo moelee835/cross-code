@@ -182,6 +182,7 @@ def smoke(binary, root):
     child = root / "src" / "feature"
     child.mkdir(parents=True)
     subprocess.run(["git", "init", "--quiet", str(root)], check=True, timeout=15)
+    system_prompt_branded = threading.Event()
     receiver_started = threading.Event()
     release_receiver = threading.Event()
     sender_done = "Independent sender response"
@@ -194,6 +195,9 @@ def smoke(binary, root):
 
         def do_POST(self):
             payload = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            if any("AI agent running in Cross Code" in json.dumps(message["content"])
+                   for message in payload["messages"] if message["role"] in ("system", "developer")):
+                system_prompt_branded.set()
             last = next((m["content"] for m in reversed(payload["messages"]) if m["role"] == "user"), "")
             if peer_task in json.dumps(last):
                 receiver_started.set()
@@ -245,8 +249,12 @@ def smoke(binary, root):
 
         windows = []
         try:
+            help_text = cli("--help")
+            assert "Cross Code command line interface" in help_text and "OpenCode" not in help_text, help_text
             verify_serve_logs(binary, root, env, model_ref, enabled=False)
             verify_serve_logs(binary, root, env, model_ref, enabled=True)
+            assert system_prompt_branded.is_set(), "The system prompt did not identify the agent as Cross Code"
+            print("The compiled CLI help and system prompt identify Cross Code.")
             print("The foreground server preserves the default and supports durable live events, resume and deletion.")
 
             env["OPENCODE_EVENTS_PERSIST"] = "true"

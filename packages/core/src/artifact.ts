@@ -1,5 +1,6 @@
 export * as Artifact from "./artifact.js"
 
+import { Brand } from "@opencode/util/brand"
 import { randomUUID } from "node:crypto"
 import fs from "node:fs/promises"
 import path from "node:path"
@@ -167,7 +168,9 @@ export interface Interface extends State.Transformable<Editor> {
     readonly provider?: ProviderID
   }) => Effect.Effect<readonly Info[], DisabledError | Session.NotFoundError>
   readonly create: (input: CreateInput) => Effect.Effect<Info, Error>
-  readonly get: (id: ID) => Effect.Effect<Content, DisabledError | NotFoundError | ProviderNotFoundError | ProviderError>
+  readonly get: (
+    id: ID,
+  ) => Effect.Effect<Content, DisabledError | NotFoundError | ProviderNotFoundError | ProviderError>
   readonly info: (id: ID) => Effect.Effect<Info, DisabledError | NotFoundError>
   readonly update: (id: ID, input: UpdateInput) => Effect.Effect<Info, Error>
   readonly remove: (id: ID) => Effect.Effect<void, DisabledError | NotFoundError | ProviderError>
@@ -223,8 +226,7 @@ const layer = Layer.effect(
       id: LocalProviderID,
       name: "Local",
       capabilities: ["static"],
-      prompt:
-        "Artifacts are served as HTML by this OpenCode server. Only people who can reach this server can open them.",
+      prompt: `Artifacts are served as HTML by this ${Brand.name} server. Only people who can reach this server can open them.`,
       create: (input) =>
         replaceDirectoryFiles(itemDir(input.id), input.files).pipe(Effect.as({ url: viewURL(input.id) })),
       read: (id) => readDirectoryFiles(itemDir(id)),

@@ -1,3 +1,4 @@
+import { Brand } from "@opencode/util/brand"
 import { intro, log, outro, spinner } from "@clack/prompts"
 import { Effect, Option } from "effect"
 import { Commands } from "../commands"
@@ -27,7 +28,7 @@ export default Runtime.handler(
       const target = requested ?? (yield* updater.latest(method))
       const version = target.trim().replace(/^v/, "")
       if (version === OPENCODE_VERSION) {
-        log.warn(`${CROSS_CODE ? "Cross Code" : "OpenCode"} upgrade skipped: ${version} is already installed`)
+        log.warn(`${Brand.name} upgrade skipped: ${version} is already installed`)
         outro("Done")
         return
       }

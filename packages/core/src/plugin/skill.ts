@@ -4,6 +4,7 @@ export * as SkillPlugin from "./skill.js"
 
 import { define, type Context } from "@opencode/plugin/effect/plugin"
 import { Document } from "@opencode/schema/config"
+import { Brand } from "@opencode/util/brand"
 import { Effect } from "effect"
 import { AbsolutePath } from "../schema.js"
 import { Skill } from "../skill.js"
@@ -14,11 +15,21 @@ import reportContent from "./skill/report.md" with { type: "text" }
 
 export const OpencodeContent = opencodeContent
 export const ReportContent = reportContent
+  .replaceAll("${PRODUCT_NAME}", Brand.name)
+  .replaceAll("${PRODUCT_COMMAND}", Brand.command)
 
 export const OpencodeDescription =
   "Use this skill for any question about OpenCode itself, including how OpenCode works, using or configuring it, migrating from V1 to V2, troubleshooting it, developing plugins or integrations, using the OpenCode SDK, clients, server, or API, and contributing to the OpenCode codebase. Also use it for OpenCode agents, commands, skills, tools, permissions, MCP servers, providers, models, themes, keybinds, formatters, the CLI, TUI, desktop app, and web app."
-const REPORT_DESCRIPTION =
-  "Use when the user wants to report an opencode issue or bug. Collect standard diagnostics, add user-specific reproduction context, and publish the issue with GitHub CLI."
+const reportSubject = Brand.crossCode ? Brand.name : Brand.command
+const REPORT_DESCRIPTION = `Use when the user wants to report ${Brand.crossCode ? "a" : "an"} ${reportSubject} issue or bug. Collect standard diagnostics, add user-specific reproduction context, and publish the issue with GitHub CLI.`
+
+const productGuide = Brand.crossCode
+  ? {
+      description:
+        "Use this skill for Cross Code installation, updates, peer messaging, headless operation, and compatible OpenCode configuration, plugins, and APIs.",
+      content: `# ${Brand.name}\n\nStart with the [${Brand.name} guide](${Brand.documentation}) for installation, updates, peer messaging, and model setup.\n\nUse \`${Brand.command}\` in command examples. The global config uses the \`cross-code\` XDG directory. Project configuration still uses \`opencode.json\` or \`opencode.jsonc\`.\n\nCross Code is based on OpenCode. For shared features, consult the [upstream documentation](https://opencode.ai/docs/) and check that the instructions apply to this release.`,
+    }
+  : { description: OpencodeDescription, content: OpencodeContent }
 
 export const Plugin = define({
   id: "opencode.skill",
@@ -28,10 +39,10 @@ export const Plugin = define({
       editor.add(
         Skill.Info.make({
           id: Skill.ID.make("opencode"),
-          name: Skill.Name.make("OpenCode"),
-          description: OpencodeDescription,
+          name: Skill.Name.make(Brand.name),
+          description: productGuide.description,
           path: AbsolutePath.make("skill://opencode/SKILL.md"),
-          content: OpencodeContent,
+          content: productGuide.content,
         }),
       )
       editor.add(
@@ -56,12 +67,15 @@ const reportContentWithDiagnostics = Effect.fn("SkillPlugin.reportContentWithDia
     process.platform === "win32" && os.arch() === "x64" && process.env.PROCESSOR_IDENTIFIER?.startsWith("ARM")
   return [
     ReportContent,
+    ...(Brand.crossCode
+      ? ["", `For ${Brand.name} bugs, use \`--repo ${new URL(Brand.repository).pathname.slice(1)}\`.`]
+      : []),
     "",
     "## Runtime Diagnostics Snapshot",
     "",
     "These values were captured when the built-in report skill was registered. Verify them before publishing.",
     "",
-    `- opencode version: ${app.version}`,
+    `- ${reportSubject} version: ${app.version}`,
     `- install/channel: ${app.channel}`,
     `- OS: ${os.type()} ${os.release()} (${os.platform()} ${os.arch()}${emulated ? ", emulated on ARM64" : ""})`,
     `- Terminal: ${terminal()}`,
