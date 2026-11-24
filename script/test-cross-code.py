@@ -1,12 +1,14 @@
-"""Exercise peer messaging through a compiled CLI, a managed service and two TUI windows."""
+"""Exercise peer messaging and durable session logs through the compiled CLI."""
 
 import base64
+from contextlib import closing
 import fcntl
 import json
 import os
 import pty
 import re
 import signal
+import sqlite3
 import struct
 import subprocess
 import sys
@@ -29,6 +31,125 @@ def until(description, condition):
             return result
         time.sleep(0.1)
     raise AssertionError(f"Timed out waiting for {description}")
+
+
+def connect(endpoint, password):
+    auth = base64.b64encode(f"opencode:{password}".encode()).decode()
+
+    def request(path, method="GET", body=None):
+        req = urllib.request.Request(
+            endpoint + path,
+            method=method,
+            data=None if body is None else json.dumps(body).encode(),
+            headers={"Authorization": f"Basic {auth}", "Content-Type": "application/json"},
+        )
+        return urllib.request.urlopen(req, timeout=15)
+
+    return request
+
+
+def json_request(request, *args):
+    with request(*args) as response:
+        return None if response.status == 204 else json.load(response)
+
+
+def log_frames(response):
+    assert response.headers.get_content_type() == "text/event-stream"
+    data = []
+    for line in response:
+        if line.startswith(b"data:"):
+            data.append(line[5:].strip())
+        elif not line.strip() and data:
+            yield json.loads(b"\n".join(data))
+            data.clear()
+
+
+def verify_serve_logs(binary, root, env, model_ref, enabled):
+    name = "persistent" if enabled else "default"
+    database = root / f"events-{name}.db"
+    output = root / f"serve-{name}.log"
+    password = "session-log-fixture"
+    server_env = {**env, "OPENCODE_PASSWORD": password, "OPENCODE_DB": str(database)}
+    server_env.pop("OPENCODE_EVENTS_PERSIST", None)
+    if enabled:
+        server_env["OPENCODE_EVENTS_PERSIST"] = "1"
+
+    with output.open("w") as log:
+        server = subprocess.Popen(
+            [binary, "serve", "--hostname", "127.0.0.1", "--port", "0"],
+            cwd=root, env=server_env, stdout=log, stderr=subprocess.STDOUT,
+        )
+        try:
+            def listening():
+                text = output.read_text()
+                assert server.poll() is None, text
+                match = re.search(r"server listening on (http://127\.0\.0\.1:\d+)", text)
+                return match.group(1) if match else None
+
+            request = connect(until(f"serve ({name}) listening", listening), password)
+            session = json_request(request, "/api/session", "POST", {
+                "title": "Session log fixture", "location": {"directory": str(root)}, "model": model_ref,
+            })["data"]["id"]
+            session_path = f"/api/session/{session}"
+            log_path = f"/api/experimental/session/{session}/log"
+
+            def prompt():
+                json_request(request, f"{session_path}/prompt", "POST", {"text": "Reply for the session log test"})
+
+            def stored_events():
+                with closing(sqlite3.connect(database)) as db:
+                    return db.execute("SELECT count(*) FROM event WHERE aggregate_id = ?", (session,)).fetchone()[0]
+
+            if not enabled:
+                prompt()
+                until("successful execution with default event persistence",
+                      lambda: json_request(request, session_path)["data"].get("outcome") == "succeeded")
+                with request(log_path) as response:
+                    assert [item["type"] for item in log_frames(response)] == ["log.synced"]
+                assert stored_events() == 0
+                return
+
+            # Start following before the prompt, then disconnect mid-turn and replay the rest.
+            with request(f"{log_path}?follow=true") as response:
+                live = log_frames(response)
+                assert next(live)["type"] == "session.created"
+                assert any(item["type"] == "log.synced" for item in live)
+                prompt()
+                live_events = []
+                for item in live:
+                    live_events.append(item)
+                    if item["type"] == "session.step.started":
+                        break
+                live_types = [item["type"] for item in live_events]
+                assert live_types[-1] == "session.step.started" and "session.execution.started" in live_types
+                seqs = [item["seq"] for item in live_events]
+                assert seqs == sorted(set(seqs))
+
+            until("successful execution with event persistence",
+                  lambda: json_request(request, session_path)["data"].get("outcome") == "succeeded")
+            with request(f"{log_path}?after={seqs[-1]}&follow=true") as response:
+                replay = []
+                for item in log_frames(response):
+                    replay.append(item)
+                    if item["type"] == "log.synced":
+                        break
+            assert replay[-1]["type"] == "log.synced"
+            resumed_seqs = [item["seq"] for item in replay[:-1]]
+            assert resumed_seqs and seqs[-1] < resumed_seqs[0] and resumed_seqs == sorted(set(resumed_seqs))
+            types = [item["type"] for item in replay[:-1]]
+            assert types.index("session.step.ended") < types.index("session.execution.succeeded"), types
+            usage = next(item["data"] for item in replay if item["type"] == "session.step.ended")
+            assert usage["finish"] == "stop" and usage["tokens"]["output"] == 3 and "cost" in usage, usage
+            assert stored_events() >= len(seqs) + len(resumed_seqs)
+            json_request(request, session_path, "DELETE")
+            assert stored_events() == 0
+        finally:
+            server.terminate()
+            try:
+                server.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                server.kill()
+                server.wait()
 
 
 def tui(binary, session, directory, env, logo_ready=None):
@@ -93,6 +214,8 @@ def smoke(binary, root):
                     "model": payload["model"],
                     "choices": [{"index": 0, "delta": delta, "finish_reason": finish}],
                 }
+                if finish:
+                    event["usage"] = {"prompt_tokens": 7, "completion_tokens": 3, "total_tokens": 10}
                 self.wfile.write(f"data: {json.dumps(event)}\n\n".encode())
             self.wfile.write(b"data: [DONE]\n\n")
 
@@ -122,19 +245,17 @@ def smoke(binary, root):
 
         windows = []
         try:
+            verify_serve_logs(binary, root, env, model_ref, enabled=False)
+            verify_serve_logs(binary, root, env, model_ref, enabled=True)
+            print("The foreground server preserves the default and supports durable live events, resume and deletion.")
+
+            env["OPENCODE_EVENTS_PERSIST"] = "true"
             password = cli("service", "get", "password")
             endpoint = cli("service", "start")
-            auth = base64.b64encode(f"opencode:{password}".encode()).decode()
+            request = connect(endpoint, password)
 
             def api(path, method="GET", body=None):
-                request = urllib.request.Request(
-                    endpoint + path,
-                    method=method,
-                    data=None if body is None else json.dumps(body).encode(),
-                    headers={"Authorization": f"Basic {auth}", "Content-Type": "application/json"},
-                )
-                with urllib.request.urlopen(request, timeout=5) as response:
-                    return json.load(response)
+                return json_request(request, path, method, body)
 
             def create(title, directory):
                 body = {"title": title, "location": {"directory": str(directory)}, "model": model_ref}
@@ -160,6 +281,9 @@ def smoke(binary, root):
             assert logo_ready.wait(45), "The Cross Code wordmark did not appear on the TUI home screen"
             print("The compiled CLI renders the Cross Code home screen wordmark.")
             sender, recipient = create("Sender", root), create("Recipient", child)
+            with request(f"/api/experimental/session/{sender}/log") as response:
+                assert next(log_frames(response))["type"] == "session.created"
+            print("The managed service honors the same event persistence environment variable.")
             for session, directory in [(sender, root), (recipient, child)]:
                 cli("session", "messaging", "--session", session, "--enable")
                 windows.append(tui(binary, session, directory, env))

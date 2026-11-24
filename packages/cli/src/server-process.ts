@@ -115,6 +115,7 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
           database: {
             path: databasePath(global.data),
           },
+          events: { persist: truthy(process.env.OPENCODE_EVENTS_PERSIST) },
           models: {
             url: process.env.OPENCODE_MODELS_URL,
             file: process.env.OPENCODE_MODELS_PATH,

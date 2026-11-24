@@ -28,3 +28,17 @@ cross-code session result --from "$SENDER" "$REQUEST_ID" --json
 ```
 
 Add `--key` to reuse the same request on a CLI retry. Models can use `session_peers`, `session_message_send`, `session_message_result`, and `session_message_reply`. Model sends and explicit replies follow the session's tool permissions. If a user steers the receiving turn with a different prompt, the original request reports `needs_reply` and shares only an explicit reply.
+
+## Persist the session event log
+
+Pass `OPENCODE_EVENTS_PERSIST=1` in the server process environment to retain durable events. The default leaves event persistence off.
+
+```sh
+OPENCODE_EVENTS_PERSIST=1 cross-code serve --hostname 127.0.0.1 --port 0
+```
+
+The same environment variable works with `serve --service`. For a managed service started by Cross Code, save it with `cross-code service set env OPENCODE_EVENTS_PERSIST 1` and run `cross-code service restart`.
+
+`GET /api/experimental/session/{sessionID}/log?follow=true` replays recorded events in sequence order, emits `log.synced`, and follows new durable events from that server. Resume with `after=<seq>`, using the last durably processed event sequence as an exclusive cursor. For completion, watch `session.execution.succeeded`, `session.execution.failed`, and `session.execution.interrupted`. For usage, `session.step.ended` includes per-step cost and tokens, while `GET /api/session/{sessionID}` reports session totals.
+
+The log API is experimental. Pin your Cross Code version if you depend on its wire format. `GET /api/event` provides live notifications without replay. Enabling persistence adds event serialization and SQLite writes from that point onward. Events missed while persistence was off cannot be backfilled. Deleting a session removes its event rows.
