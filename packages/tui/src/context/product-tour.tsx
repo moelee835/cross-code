@@ -3,13 +3,12 @@ import { DialogProductTour, type TourPeer } from "../component/dialog-product-to
 import { emptyPrompt } from "../prompt/history"
 import { useDialog } from "../ui/dialog"
 import { useToast } from "../ui/toast"
+import { tourCopy, type TourLanguage } from "../util/product-tour-copy"
 import { useClient } from "./client"
 import { useData } from "./data"
 import { usePromptRef } from "./prompt"
 import { useRoute } from "./route"
 import { useStorage } from "./storage"
-
-const firstPrompt = "Briefly explain the main directories in this project. Read files only and make no changes."
 
 export function createProductTour(input: {
   invite: boolean
@@ -23,8 +22,13 @@ export function createProductTour(input: {
   const prompt = usePromptRef()
   const route = useRoute()
   const toast = useToast()
-  const [progress, update] = useStorage().store("product-tour", { initial: { hidden: false, firstResponse: false } })
-  let awaitingSample = false
+  const [progress, update] = useStorage().store<{ hidden: boolean; firstResponse: boolean; language?: TourLanguage }>(
+    "product-tour",
+    { initial: { hidden: false, firstResponse: false } },
+  )
+  const language = () => (progress.language === "ko" ? "ko" : "en")
+  const copy = () => tourCopy[language()]
+  let awaitingSample: string | undefined
 
   const sessionID = () =>
     route.data.type === "session" && route.data.sessionID.startsWith("ses_") ? route.data.sessionID : undefined
@@ -48,15 +52,12 @@ export function createProductTour(input: {
       const messages = data.session.message.list(event.data.sessionID)
       const user = messages.findLastIndex((message) => message.type === "user")
       const message = messages[user]
-      if (message?.type !== "user" || message.text !== firstPrompt) return
+      if (message?.type !== "user" || message.text !== awaitingSample) return
       if (!messages.slice(user + 1).some((item) => item.type === "assistant")) return
-      awaitingSample = false
+      awaitingSample = undefined
       void update((draft) => {
         draft.firstResponse = true
-      }).then(
-        () => toast.show({ message: "First response received. Open /tour to try peer messaging.", variant: "success" }),
-        toast.error,
-      )
+      }).then(() => toast.show({ message: copy().firstResponse, variant: "success" }), toast.error)
     }),
   )
 
@@ -64,7 +65,7 @@ export function createProductTour(input: {
     const composer = prompt.current
     const current = composer?.current
     if (!composer || !current || composer.mode !== "normal") {
-      toast.show({ message: "Open a chat prompt before filling it with an example.", variant: "info" })
+      toast.show({ message: copy().needsChat, variant: "info" })
       return
     }
     if (
@@ -74,13 +75,11 @@ export function createProductTour(input: {
       current.skills?.length ||
       current.pasted.length
     ) {
-      toast.show({ message: "Clear or save your current draft before filling the prompt.", variant: "info" })
+      toast.show({ message: copy().hasDraft, variant: "info" })
       return
     }
-    const text = peerID
-      ? `Use session_message_send to ask peer ${peerID} to reply with “received”. Report the request ID and continue without waiting for the reply.`
-      : firstPrompt
-    if (!peerID && !progress.firstResponse) awaitingSample = true
+    const text = peerID ? copy().peerPrompt(peerID) : copy().sample
+    if (!peerID && !progress.firstResponse) awaitingSample = text
     dialog.clear()
     composer.set({ ...emptyPrompt(), text })
     composer.focus()
@@ -93,6 +92,8 @@ export function createProductTour(input: {
   }
 
   return {
+    language,
+    homeLabel: () => copy().home,
     visible: () => input.invite && client.connection.status() === "connected" && !progress.hidden,
     dismiss,
     open() {
@@ -100,6 +101,13 @@ export function createProductTour(input: {
       dialog.replace(() => (
         <DialogProductTour
           start={start}
+          language={language}
+          setLanguage={(next) => {
+            if (next === language()) return
+            void update((draft) => {
+              draft.language = next
+            }).catch(toast.error)
+          }}
           connected={input.connected}
           messaging={messaging}
           sessionID={sessionID}

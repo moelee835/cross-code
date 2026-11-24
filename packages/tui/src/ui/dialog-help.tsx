@@ -3,7 +3,7 @@ import { Keymap } from "../context/keymap"
 import { useTheme } from "../context/theme"
 import { DialogHeader, DialogLayout, useDialog } from "./dialog"
 
-export function DialogHelp(props: { openTour?: () => void }) {
+export function DialogHelp(props: { openTour?: () => void; tourLabel?: string }) {
   const dialog = useDialog()
   const theme = useTheme().surface("dialog")
   const shortcuts = Keymap.useShortcuts()
@@ -40,7 +40,7 @@ export function DialogHelp(props: { openTour?: () => void }) {
       <Show when={props.openTour}>
         {(open) => (
           <text fg={theme.text.action.primary.selected} onMouseUp={open()}>
-            Product tour · press t
+            {props.tourLabel}
           </text>
         )}
       </Show>
