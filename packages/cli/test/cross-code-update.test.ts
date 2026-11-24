@@ -37,37 +37,66 @@ test.skipIf(!supported)("selects the newest complete published prerelease by ver
   expect((await CrossCodeUpdate.release(signal, undefined, request)).version).toBe(version)
 })
 
-test.skipIf(!supported)("verifies an archive before atomically replacing the executable", async () => {
-  const oldBinary = "#!/bin/sh\nprintf 'cross-code v0.1.0-alpha.8\\n'\n"
-  const newBinary = `#!/bin/sh\nprintf 'cross-code v${version}\\n'\n`
-  const tar = await new Bun.Archive({ "cross-code": newBinary }).blob()
-  const bytes = Bun.gzipSync(await tar.bytes())
-  const sha256 = createHash("sha256").update(bytes).digest("hex")
-  const request = (checksum: string) => async (url: string | URL | Request) => {
-    const address = String(url)
-    if (address.startsWith("https://api.github.com/")) return Response.json(release(version, { size: bytes.length }))
-    const root = `https://github.com/moelee835/cross-code/releases/download/cross-code-v${version}`
-    if (address === `${root}/SHA256SUMS`) return new Response(`${checksum}  ${archive}\n`)
-    expect(address).toBe(`${root}/${archive}`)
-    return new Response(bytes)
+test.skipIf(!supported)("finds a published prerelease through the public feed when the API returns 403", async () => {
+  const root = "https://github.com/moelee835/cross-code/releases"
+  const request = async (url: string) => {
+    if (url === "https://api.github.com/repos/moelee835/cross-code/releases?per_page=100") {
+      return Response.json({ message: "API rate limit exceeded" }, { status: 403 })
+    }
+    if (url === `${root}.atom`) {
+      return new Response(
+        `<feed xmlns="http://www.w3.org/2005/Atom">
+          <entry><link rel="alternate" type="text/html" href="${root}/tag/cross-code-v0.1.1-dev.9"/></entry>
+          <entry><link rel="alternate" type="text/html" href="${root}/tag/cross-code-v${version}"/></entry>
+          <entry><link rel="alternate" type="text/html" href="${root}/tag/cross-code-v0.1.1-dev.13"/></entry>
+        </feed>`,
+      )
+    }
+    if (url === `${root}/download/cross-code-v0.1.1-dev.13/SHA256SUMS`) return new Response(null, { status: 404 })
+    expect(url).toBe(`${root}/download/cross-code-v${version}/SHA256SUMS`)
+    return new Response(`${"0".repeat(64)}  ${archive}\n`)
   }
-  const dir = await mkdtemp(path.join(tmpdir(), "cross-code-update-"))
-  try {
-    const executable = path.join(dir, "cross-code")
-    await writeFile(executable, oldBinary)
-    await chmod(executable, 0o755)
-    const selected = await CrossCodeUpdate.release(signal, version, request(sha256))
 
-    await expect(CrossCodeUpdate.install(selected, executable, signal, request("0".repeat(64)))).rejects.toThrow(
-      "SHA-256",
-    )
-    expect(await readFile(executable, "utf8")).toBe(oldBinary)
-    expect(await readdir(dir)).toEqual(["cross-code"])
-
-    await CrossCodeUpdate.install(selected, executable, signal, request(sha256))
-    expect(await CrossCodeUpdate.installedVersion(executable, signal)).toBe(version)
-    expect(await readdir(dir)).toEqual(["cross-code"])
-  } finally {
-    await rm(dir, { recursive: true, force: true })
-  }
+  expect((await CrossCodeUpdate.release(signal, undefined, request)).version).toBe(version)
 })
+
+test.skipIf(!supported).each([200, 403, 429])(
+  "verifies an archive before replacing the executable (API %i)",
+  async (apiStatus) => {
+    const oldBinary = "#!/bin/sh\nprintf 'cross-code v0.1.0-alpha.8\\n'\n"
+    const newBinary = `#!/bin/sh\nprintf 'cross-code v${version}\\n'\n`
+    const tar = await new Bun.Archive({ "cross-code": newBinary }).blob()
+    const bytes = Bun.gzipSync(await tar.bytes())
+    const sha256 = createHash("sha256").update(bytes).digest("hex")
+    const request = (checksum: string) => async (url: string | URL | Request) => {
+      const address = String(url)
+      if (address.startsWith("https://api.github.com/")) {
+        expect(address).toBe(`https://api.github.com/repos/moelee835/cross-code/releases/tags/cross-code-v${version}`)
+        return Response.json(release(version, { size: bytes.length }), { status: apiStatus })
+      }
+      const root = `https://github.com/moelee835/cross-code/releases/download/cross-code-v${version}`
+      if (address === `${root}/SHA256SUMS`) return new Response(`${checksum}  ${archive}\n`)
+      expect(address).toBe(`${root}/${archive}`)
+      return new Response(bytes)
+    }
+    const dir = await mkdtemp(path.join(tmpdir(), "cross-code-update-"))
+    try {
+      const executable = path.join(dir, "cross-code")
+      await writeFile(executable, oldBinary)
+      await chmod(executable, 0o755)
+      const selected = await CrossCodeUpdate.release(signal, version, request(sha256))
+
+      await expect(CrossCodeUpdate.install(selected, executable, signal, request("0".repeat(64)))).rejects.toThrow(
+        "SHA-256",
+      )
+      expect(await readFile(executable, "utf8")).toBe(oldBinary)
+      expect(await readdir(dir)).toEqual(["cross-code"])
+
+      await CrossCodeUpdate.install(selected, executable, signal, request(sha256))
+      expect(await CrossCodeUpdate.installedVersion(executable, signal)).toBe(version)
+      expect(await readdir(dir)).toEqual(["cross-code"])
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  },
+)
