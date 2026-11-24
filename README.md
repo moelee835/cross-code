@@ -1,9 +1,9 @@
 <p align="center">
   <a href="https://github.com/moelee835/cross-code">
     <picture>
-      <source srcset=".github/assets/logo-ornate-dark.svg" media="(prefers-color-scheme: dark)">
-      <source srcset=".github/assets/logo-ornate-light.svg" media="(prefers-color-scheme: light)">
-      <img src=".github/assets/logo-ornate-light.svg" alt="OpenCode, the upstream project">
+      <source srcset=".github/assets/cross-code-logo-dark.svg" media="(prefers-color-scheme: dark)">
+      <source srcset=".github/assets/cross-code-logo-light.svg" media="(prefers-color-scheme: light)">
+      <img src=".github/assets/cross-code-logo-light.svg" alt="Cross Code">
     </picture>
   </a>
 </p>
@@ -108,7 +108,7 @@ Report Cross Code issues in this repository and target the `dev` branch for pull
 
 ### About Cross Code
 
-Cross Code builds on OpenCode. The logo and preview above come from the upstream project. [OpenCode source](https://github.com/anomalyco/opencode) · [License](./LICENSE)
+Cross Code builds on OpenCode. The terminal screenshot above comes from the upstream project. [OpenCode source](https://github.com/anomalyco/opencode) · [License](./LICENSE)
 
 ---
 

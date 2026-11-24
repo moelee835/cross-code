@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="324" height="42" viewBox="0 0 54 7" role="img" aria-label="Cross Code">
+  <defs>
+    <path id="c" d="M1 0h4v1H2v4h3v1H1V5H0V1h1Z"/>
+    <path id="r" fill-rule="evenodd" d="M0 0h4v1h1v2H4v1h1v2H3V4H2v2H0Z M2 1v2h1V1Z"/>
+    <path id="o" fill-rule="evenodd" d="M1 0h3v1h1v4H4v1H1V5H0V1h1Z M2 1h1v4H2Z"/>
+    <path id="s" d="M1 0h4v1H2v1h2v1h1v2H4v1H0V5h3V3H1V2H0V1h1Z"/>
+    <path id="d" fill-rule="evenodd" d="M0 0h4v1h1v4H4v1H0Z M2 1h1v4H2Z"/>
+    <path id="e" d="M0 0h5v1H2v1h2v1H2v2h3v1H0Z"/>
+  </defs>
+  <g transform="translate(0 .5)" shape-rendering="crispEdges">
+    <g fill="#656363">
+      <use href="#c"/>
+      <use href="#r" x="6"/>
+      <use href="#o" x="12"/>
+      <use href="#s" x="18"/>
+      <use href="#s" x="24"/>
+    </g>
+    <g fill="#211E1E">
+      <use href="#c" x="31"/>
+      <use href="#o" x="37"/>
+      <use href="#d" x="43"/>
+      <use href="#e" x="49"/>
+    </g>
+  </g>
+</svg>
