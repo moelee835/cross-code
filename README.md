@@ -1,90 +1,91 @@
 <p align="center">
-  <a href="https://opencode.ai">
+  <a href="https://github.com/moelee835/cross-code">
     <picture>
       <source srcset=".github/assets/logo-ornate-dark.svg" media="(prefers-color-scheme: dark)">
       <source srcset=".github/assets/logo-ornate-light.svg" media="(prefers-color-scheme: light)">
-      <img src=".github/assets/logo-ornate-light.svg" alt="OpenCode logo">
+      <img src=".github/assets/logo-ornate-light.svg" alt="OpenCode, the upstream project">
     </picture>
   </a>
 </p>
-<p align="center">The open source AI coding agent.</p>
+<p align="center"><strong>Cross Code</strong> adds asynchronous messaging between OpenCode coding sessions.</p>
 <p align="center">
-  <a href="https://opencode.ai/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
-  <a href="https://www.npmjs.com/package/@opencode/cli"><img alt="npm" src="https://img.shields.io/npm/v/@opencode/cli?style=flat-square" /></a>
-  <a href="https://github.com/anomalyco/opencode/actions/workflows/release.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/anomalyco/opencode/release.yml?style=flat-square&branch=dev" /></a>
+  <a href="https://github.com/moelee835/cross-code/issues"><img alt="Issues" src="https://img.shields.io/github/issues/moelee835/cross-code?style=flat-square" /></a>
+  <a href="https://github.com/moelee835/cross-code/releases"><img alt="Cross Code release" src="https://img.shields.io/github/v/release/moelee835/cross-code?include_prereleases&style=flat-square" /></a>
+  <a href="https://github.com/moelee835/cross-code/actions/workflows/cross-code-release.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/moelee835/cross-code/cross-code-release.yml?style=flat-square" /></a>
 </p>
 
 <p align="center">
-  <a href="README.md">English</a> |
-  <a href="README.zh.md">简体中文</a> |
-  <a href="README.zht.md">繁體中文</a> |
-  <a href="README.ko.md">한국어</a> |
-  <a href="README.de.md">Deutsch</a> |
-  <a href="README.es.md">Español</a> |
-  <a href="README.fr.md">Français</a> |
-  <a href="README.it.md">Italiano</a> |
-  <a href="README.da.md">Dansk</a> |
-  <a href="README.ja.md">日本語</a> |
-  <a href="README.pl.md">Polski</a> |
-  <a href="README.ru.md">Русский</a> |
-  <a href="README.bs.md">Bosanski</a> |
-  <a href="README.ar.md">العربية</a> |
-  <a href="README.no.md">Norsk</a> |
-  <a href="README.br.md">Português (Brasil)</a> |
-  <a href="README.th.md">ไทย</a> |
-  <a href="README.tr.md">Türkçe</a> |
-  <a href="README.uk.md">Українська</a> |
-  <a href="README.bn.md">বাংলা</a> |
-  <a href="README.gr.md">Ελληνικά</a> |
-  <a href="README.vi.md">Tiếng Việt</a>
+  <a href="#installation">Installation</a> |
+  <a href="#peer-messaging">Peer messaging</a> |
+  <a href="#agents">Agents</a> |
+  <a href="#documentation">Documentation</a>
 </p>
 
-[![OpenCode Terminal UI](services/site/public/v1/docs/assets/lander/screenshot.png)](https://opencode.ai)
+[![Upstream OpenCode terminal interface](services/site/public/v1/docs/assets/lander/screenshot.png)](https://github.com/anomalyco/opencode)
 
 ---
 
 ### Installation
 
-```bash
-# YOLO
-curl -fsSL https://opencode.ai/v2/install | bash
+Install Cross Code from the release archive for your platform. The following example uses Linux x86_64, including WSL on x86_64. [Cross Code releases](https://github.com/moelee835/cross-code/releases)
 
-# Package managers
-npm i -g @opencode/cli@latest      # or bun/pnpm/yarn
-brew install anomalyco/tap/opencode-v2 # macOS and Linux (recommended, always up to date)
-brew install opencode              # macOS and Linux (official brew formula, updated less)
-sudo pacman -S opencode            # Arch Linux (Stable)
-paru -S opencode-beta              # Arch Linux (Latest from AUR)
-mise use -g opencode               # Any OS
-nix run github:anomalyco/opencode  # Nix
+```bash
+(
+  set -e
+  temp_dir=$(mktemp -d)
+  trap 'rm -rf -- "$temp_dir"' EXIT
+  cd "$temp_dir"
+
+  release="https://github.com/moelee835/cross-code/releases/download/cross-code-v0.1.0-alpha.6"
+  archive="cross-code-linux-x64.tar.gz"
+  curl -fsSLO "$release/$archive"
+  curl -fsSLO "$release/SHA256SUMS"
+  sha256sum --ignore-missing -c SHA256SUMS
+  tar -xzf "$archive" cross-code
+  mkdir -p "$HOME/.local/bin"
+  install -m 755 cross-code "$HOME/.local/bin/cross-code"
+)
+
+export PATH="$HOME/.local/bin:$PATH"
+cross-code --version
 ```
 
 > [!TIP]
-> Remove versions older than 0.1.x before installing.
+> Add the `export PATH` line to `~/.bashrc` or `~/.zshrc` to keep `cross-code` available in new terminals.
 
-### Desktop App (BETA)
+### Downloads
 
-OpenCode is also available as a desktop application. Download it from [opencode.ai/download](https://opencode.ai/download).
+The current prerelease packages the Cross Code CLI and terminal UI for these platforms.
 
-| Platform              | Download                           |
-| --------------------- | ---------------------------------- |
-| macOS (Apple Silicon) | `opencode-desktop-mac-arm64.dmg`   |
-| macOS (Intel)         | `opencode-desktop-mac-x64.dmg`     |
-| Windows               | `opencode-desktop-win-x64.exe`     |
-| Linux                 | `.deb`, `.rpm`, or `.AppImage`     |
+| Platform | Download |
+| -------- | -------- |
+| Linux and WSL (x86_64) | [cross-code-linux-x64.tar.gz](https://github.com/moelee835/cross-code/releases/download/cross-code-v0.1.0-alpha.6/cross-code-linux-x64.tar.gz) |
+| macOS (Apple Silicon) | [cross-code-darwin-arm64.tar.gz](https://github.com/moelee835/cross-code/releases/download/cross-code-v0.1.0-alpha.6/cross-code-darwin-arm64.tar.gz) |
 
-```bash
-# macOS (Homebrew)
-brew install --cask opencode-desktop
-```
+On macOS, use the same installation commands with `archive="cross-code-darwin-arm64.tar.gz"` and replace the `sha256sum` line with `grep -F "  $archive" SHA256SUMS | shasum -a 256 -c`. [SHA256SUMS](https://github.com/moelee835/cross-code/releases/download/cross-code-v0.1.0-alpha.6/SHA256SUMS)
 
 #### Installation Directory
 
-The install script installs OpenCode to `$HOME/.opencode/bin`.
+The commands above install the executable in `$HOME/.local/bin`. To upgrade, replace that executable and run `cross-code service restart` before reopening your sessions.
+
+### Peer Messaging
+
+Sessions on the same local managed server can discover each other after opting in. Sending a message returns a request ID immediately and queues a model turn in the receiving session. The sender can keep working or accept another prompt. When the receiving turn finishes, its response is delivered to the sender's session.
+
+```bash
+cross-code service set env OPENCODE_FLAGS session_messaging
+cross-code service restart
+```
+
+1. Run `cross-code` in two terminals in the same Git repository. Its root and subdirectories work together as soon as you run `git init`. A separately initialized nested repository has its own peers.
+2. Connect a model with `/connect` if needed. For Gemini with a personal Google account, choose **Google** and use a Gemini API key. [Gemini setup](./CROSS-CODE.md#connect-a-gemini-model)
+3. Run `/peer-messaging` in both sessions. Ask one agent to list its peers, then ask it to send a task to the other session.
+
+To discover or message peers from a script, use the session commands. [Peer messaging CLI](./CROSS-CODE.md#send-messages-from-the-cli)
 
 ### Agents
 
-OpenCode includes two built-in agents you can switch between with the `Tab` key.
+Cross Code includes OpenCode's built-in agents. Switch between `build` and `plan` with the `Tab` key.
 
 - **build** - Default, full-access agent for development work
 - **plan** - Read-only agent for analysis and code exploration
@@ -99,16 +100,16 @@ Learn more about [agents](https://opencode.ai/docs/agents).
 
 ### Documentation
 
-For more info on how to configure OpenCode, [**head over to our docs**](https://opencode.ai/docs).
+Read the Cross Code guide for installation, Gemini configuration, and peer messaging CLI commands. OpenCode's documentation covers the underlying configuration and agent behavior. [Cross Code guide](./CROSS-CODE.md) · [OpenCode documentation](https://opencode.ai/docs)
 
 ### Contributing
 
-If you're interested in contributing to OpenCode, please read our [contributing docs](./CONTRIBUTING.md) before submitting a pull request.
+Report Cross Code issues in this repository and target the `dev` branch for pull requests. See the repository guide for development conventions. [Issues](https://github.com/moelee835/cross-code/issues) · [Repository guide](./AGENTS.md)
 
-### Building on OpenCode
+### About Cross Code
 
-If you are working on a project that's related to OpenCode and is using "opencode" as part of its name, for example "opencode-dashboard" or "opencode-mobile", please add a note to your README to clarify that it is not built by the OpenCode team and is not affiliated with us in any way.
+Cross Code builds on OpenCode. The logo and preview above come from the upstream project. [OpenCode source](https://github.com/anomalyco/opencode) · [License](./LICENSE)
 
 ---
 
-**Join our community** [Discord](https://discord.gg/opencode) | [X.com](https://x.com/opencode)
+**Project links** [Releases](https://github.com/moelee835/cross-code/releases) | [Issues](https://github.com/moelee835/cross-code/issues)
