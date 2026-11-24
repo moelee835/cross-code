@@ -152,7 +152,7 @@ def verify_serve_logs(binary, root, env, model_ref, enabled):
                 server.wait()
 
 
-def tui(binary, session, directory, env, logo_ready=None):
+def tui(binary, session, directory, env, logo_ready=None, tour_ready=None):
     pid, terminal = pty.fork()
     if pid == 0:
         os.chdir(directory)
@@ -163,14 +163,19 @@ def tui(binary, session, directory, env, logo_ready=None):
     def drain():
         csi = re.compile(rb"\x1b\[[0-?]*[ -/]*[@-~]")
         cross_logo = "▄█▀▀▀ ██▀█▄ ▄█▀█▄ ▄█▀▀▀ ▄█▀▀▀".encode()
+        tour_hint = "Start here · /tour".encode()
         tail = b""
         try:
             while chunk := os.read(terminal, 4096):
-                if logo_ready is not None and not logo_ready.is_set():
-                    output = tail + chunk
-                    if cross_logo in csi.sub(b"", output):
-                        logo_ready.set()
-                    tail = output[-4096:]
+                if all(ready is None or ready.is_set() for ready in (logo_ready, tour_ready)):
+                    continue
+                output = tail + chunk
+                visible = csi.sub(b"", output)
+                if logo_ready is not None and cross_logo in visible:
+                    logo_ready.set()
+                if tour_ready is not None and tour_hint in visible:
+                    tour_ready.set()
+                tail = output[-4096:]
         except OSError:
             pass
 
@@ -285,9 +290,11 @@ def smoke(binary, root):
             until("bundled Gemini OAuth and Google API key options", google_methods_ready)
             print("The compiled CLI exposes both Google sign-in methods.")
             logo_ready = threading.Event()
-            windows.append(tui(binary, None, root, env, logo_ready))
+            tour_ready = threading.Event()
+            windows.append(tui(binary, None, root, env, logo_ready, tour_ready))
             assert logo_ready.wait(45), "The Cross Code wordmark did not appear on the TUI home screen"
-            print("The compiled CLI renders the Cross Code home screen wordmark.")
+            assert tour_ready.wait(45), "The first-run product tour hint did not appear on the TUI home screen"
+            print("The compiled CLI renders the Cross Code wordmark and first-run tour hint.")
             sender, recipient = create("Sender", root), create("Recipient", child)
             with request(f"/api/experimental/session/{sender}/log") as response:
                 assert next(log_frames(response))["type"] == "session.created"
