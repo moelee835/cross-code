@@ -36,7 +36,7 @@ Install Cross Code from the release archive for your platform. The following exa
   trap 'rm -rf -- "$temp_dir"' EXIT
   cd "$temp_dir"
 
-  release="https://github.com/moelee835/cross-code/releases/download/cross-code-v0.1.0-alpha.7"
+  release="https://github.com/moelee835/cross-code/releases/download/cross-code-v0.1.0-alpha.8"
   archive="cross-code-linux-x64.tar.gz"
   curl -fsSLO "$release/$archive"
   curl -fsSLO "$release/SHA256SUMS"
@@ -59,10 +59,10 @@ The current prerelease packages the Cross Code CLI and terminal UI for these pla
 
 | Platform | Download |
 | -------- | -------- |
-| Linux and WSL (x86_64) | [cross-code-linux-x64.tar.gz](https://github.com/moelee835/cross-code/releases/download/cross-code-v0.1.0-alpha.7/cross-code-linux-x64.tar.gz) |
-| macOS (Apple Silicon) | [cross-code-darwin-arm64.tar.gz](https://github.com/moelee835/cross-code/releases/download/cross-code-v0.1.0-alpha.7/cross-code-darwin-arm64.tar.gz) |
+| Linux and WSL (x86_64) | [cross-code-linux-x64.tar.gz](https://github.com/moelee835/cross-code/releases/download/cross-code-v0.1.0-alpha.8/cross-code-linux-x64.tar.gz) |
+| macOS (Apple Silicon) | [cross-code-darwin-arm64.tar.gz](https://github.com/moelee835/cross-code/releases/download/cross-code-v0.1.0-alpha.8/cross-code-darwin-arm64.tar.gz) |
 
-On macOS, use the same installation commands with `archive="cross-code-darwin-arm64.tar.gz"` and replace the `sha256sum` line with `grep -F "  $archive" SHA256SUMS | shasum -a 256 -c`. [SHA256SUMS](https://github.com/moelee835/cross-code/releases/download/cross-code-v0.1.0-alpha.7/SHA256SUMS)
+On macOS, use the same installation commands with `archive="cross-code-darwin-arm64.tar.gz"` and replace the `sha256sum` line with `grep -F "  $archive" SHA256SUMS | shasum -a 256 -c`. [SHA256SUMS](https://github.com/moelee835/cross-code/releases/download/cross-code-v0.1.0-alpha.8/SHA256SUMS)
 
 #### Installation Directory
 

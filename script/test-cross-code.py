@@ -122,7 +122,7 @@ def verify_serve_logs(binary, root, env, model_ref, enabled):
                         break
                 live_types = [item["type"] for item in live_events]
                 assert live_types[-1] == "session.step.started" and "session.execution.started" in live_types
-                seqs = [item["seq"] for item in live_events]
+                seqs = [item["durable"]["seq"] for item in live_events]
                 assert seqs == sorted(set(seqs))
 
             until("successful execution with event persistence",
@@ -134,7 +134,7 @@ def verify_serve_logs(binary, root, env, model_ref, enabled):
                     if item["type"] == "log.synced":
                         break
             assert replay[-1]["type"] == "log.synced"
-            resumed_seqs = [item["seq"] for item in replay[:-1]]
+            resumed_seqs = [item["durable"]["seq"] for item in replay[:-1]]
             assert resumed_seqs and seqs[-1] < resumed_seqs[0] and resumed_seqs == sorted(set(resumed_seqs))
             types = [item["type"] for item in replay[:-1]]
             assert types.index("session.step.ended") < types.index("session.execution.succeeded"), types
