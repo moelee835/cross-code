@@ -27,7 +27,7 @@
 
 ### Installation
 
-Install Cross Code from the release archive for your platform. The following example uses Linux x86_64, including WSL on x86_64. [Cross Code releases](https://github.com/moelee835/cross-code/releases)
+Install Cross Code from the release archive for your platform. The following example uses Linux x86_64, including WSL on x86_64. Copy the tag of the newest release you want to install. [Cross Code releases](https://github.com/moelee835/cross-code/releases)
 
 ```bash
 (
@@ -36,7 +36,8 @@ Install Cross Code from the release archive for your platform. The following exa
   trap 'rm -rf -- "$temp_dir"' EXIT
   cd "$temp_dir"
 
-  release="https://github.com/moelee835/cross-code/releases/download/cross-code-v0.1.0-alpha.8"
+  read -r -p "Cross Code release tag: " release_tag
+  release="https://github.com/moelee835/cross-code/releases/download/$release_tag"
   archive="cross-code-linux-x64.tar.gz"
   curl -fsSLO "$release/$archive"
   curl -fsSLO "$release/SHA256SUMS"
@@ -59,14 +60,14 @@ The current prerelease packages the Cross Code CLI and terminal UI for these pla
 
 | Platform | Download |
 | -------- | -------- |
-| Linux and WSL (x86_64) | [cross-code-linux-x64.tar.gz](https://github.com/moelee835/cross-code/releases/download/cross-code-v0.1.0-alpha.8/cross-code-linux-x64.tar.gz) |
-| macOS (Apple Silicon) | [cross-code-darwin-arm64.tar.gz](https://github.com/moelee835/cross-code/releases/download/cross-code-v0.1.0-alpha.8/cross-code-darwin-arm64.tar.gz) |
+| Linux and WSL (x86_64) | `cross-code-linux-x64.tar.gz` |
+| macOS (Apple Silicon) | `cross-code-darwin-arm64.tar.gz` |
 
-On macOS, use the same installation commands with `archive="cross-code-darwin-arm64.tar.gz"` and replace the `sha256sum` line with `grep -F "  $archive" SHA256SUMS | shasum -a 256 -c`. [SHA256SUMS](https://github.com/moelee835/cross-code/releases/download/cross-code-v0.1.0-alpha.8/SHA256SUMS)
+On macOS, use the same installation commands with `archive="cross-code-darwin-arm64.tar.gz"` and replace the `sha256sum` line with `grep -F "  $archive" SHA256SUMS | shasum -a 256 -c`. Both archives and `SHA256SUMS` are available under the release's Assets. [Cross Code releases](https://github.com/moelee835/cross-code/releases)
 
 #### Installation Directory
 
-The commands above install the executable in `$HOME/.local/bin`. To upgrade, replace that executable and run `cross-code service restart` before reopening your sessions.
+The commands above install the executable in `$HOME/.local/bin`. Releases that include the updater check for new versions at startup. Run `cross-code upgrade` or use `/update` in the terminal UI to install a verified release. Reopen Cross Code when your work is finished to load the new version. [Update guide](./CROSS-CODE.md#update-cross-code)
 
 ### Peer Messaging
 

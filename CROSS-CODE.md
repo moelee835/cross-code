@@ -13,6 +13,14 @@ cross-code service restart
 
 Open two sessions in the same project using the default managed service. A Git repository's root and its subdirectories can share peers as soon as you run `git init`. A separately initialized nested repository has its own peers. Run `/peer-messaging` in each session to opt in. The feature is available on an authenticated loopback service with remote access disabled. Closing a session removes it from discovery. Completed results for a closed sender remain recorded and are delivered when the sender reopens.
 
+## Update Cross Code
+
+GitHub Actions validates pull requests targeting `dev`. A push to `dev` builds and tests the Linux x64 and macOS arm64 binaries, then publishes both archives and `SHA256SUMS` as a public prerelease. Automated versions use `0.1.1-dev.<run number>`. Maintainers can also publish an explicitly versioned `cross-code-v*` tag. [Cross Code CI and release](https://github.com/moelee835/cross-code/actions/workflows/cross-code-release.yml)
+
+Cross Code checks GitHub Releases on startup and notifies you by default. Use `cross-code upgrade` or `/update` to install a newer release. Cross Code checks the archive against `SHA256SUMS` before replacing the executable. Reopen Cross Code when your current work is finished. For a separately managed headless service, restart it at your chosen time to run the new binary.
+
+In the global Cross Code configuration, `"update": "auto"` opts into automatic installation and `"update": "disable"` disables automatic checks. An installation made with `v0.1.0-alpha.8` or earlier needs one manual upgrade from Releases before it can update itself. [Cross Code releases](https://github.com/moelee835/cross-code/releases)
+
 ## Connect a Gemini model
 
 Open `/connect` and choose **Google**. For a personal Google account, choose the API key method and use a [Gemini API key](https://ai.google.dev/gemini-api/docs/api-key).

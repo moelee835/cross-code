@@ -1,12 +1,19 @@
-name: Cross Code prerelease
+name: Cross Code CI and release
 
 on:
   push:
+    branches: [dev]
     tags: ["cross-code-v*"]
+  pull_request:
+    branches: [dev]
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: cross-code-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:
@@ -26,9 +33,34 @@ jobs:
         working-directory: packages/server
       - run: bun run check:generated
         working-directory: packages/client
+      - run: bun test test/cross-code-update.test.ts
+        working-directory: packages/cli
+
+  version:
+    if: github.repository == 'moelee835/cross-code'
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - id: version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#cross-code-v}"
+          elif [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF" == "refs/heads/dev" ]]; then
+            version="0.1.1-dev.$GITHUB_RUN_NUMBER"
+          else
+            version="0.0.0-cross-code.$GITHUB_RUN_NUMBER"
+          fi
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
+            echo "Invalid Cross Code version" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
   build:
     if: github.repository == 'moelee835/cross-code'
+    needs: version
     strategy:
       fail-fast: false
       matrix:
@@ -42,6 +74,7 @@ jobs:
       CROSS_CODE_BUILD: "1"
       OPENCODE_CHANNEL: cross-code
       OPENCODE_TARGET: ${{ matrix.target }}
+      OPENCODE_VERSION: ${{ needs.version.outputs.version }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -49,20 +82,14 @@ jobs:
           bun-version-file: package.json
       - run: bun install --frozen-lockfile
       - name: Build the CLI
-        shell: bash
-        run: |
-          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
-            export OPENCODE_VERSION="${GITHUB_REF_NAME#cross-code-v}"
-          else
-            export OPENCODE_VERSION="0.0.0-cross-code-$GITHUB_RUN_NUMBER"
-          fi
-          bun run --cwd packages/cli script/build.ts --skip-install --skip-web-ui
+        run: bun run --cwd packages/cli script/build.ts --skip-install --skip-web-ui
       - name: Verify the CLI and two TUI sessions
         shell: bash
         run: |
           binary="packages/cli/dist/cli-$OPENCODE_TARGET/bin/cross-code"
-          "$binary" --version
+          test "$("$binary" --version)" = "cross-code v$OPENCODE_VERSION"
           "$binary" session send --help
+          "$binary" upgrade --help
           python3 script/test-cross-code.py "$binary"
       - name: Pack the CLI
         shell: bash
@@ -74,10 +101,12 @@ jobs:
         with:
           name: cross-code-${{ matrix.target }}
           path: artifacts/*.tar.gz
+          overwrite: true
+          if-no-files-found: error
 
   release:
-    if: github.repository == 'moelee835/cross-code' && github.ref_type == 'tag'
-    needs: [check, build]
+    if: github.repository == 'moelee835/cross-code' && github.event_name == 'push' && (github.ref == 'refs/heads/dev' || github.ref_type == 'tag')
+    needs: [check, build, version]
     permissions:
       contents: write
     runs-on: ubuntu-24.04
@@ -91,7 +120,23 @@ jobs:
       - name: Publish binaries and SHA-256 checksums
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ needs.version.outputs.version }}
         run: |
-          (cd artifacts && sha256sum cross-code-*.tar.gz > SHA256SUMS)
-          gh release create "$GITHUB_REF_NAME" --verify-tag --prerelease \
-            --title "$GITHUB_REF_NAME" --notes-file CROSS-CODE.md artifacts/*.tar.gz artifacts/SHA256SUMS
+          tag="cross-code-v$RELEASE_VERSION"
+          (cd artifacts && sha256sum cross-code-darwin-arm64.tar.gz cross-code-linux-x64.tar.gz > SHA256SUMS)
+          if release=$(gh release view "$tag" --json isDraft,targetCommitish 2>/dev/null); then
+            target=$(git ls-remote origin "refs/tags/$tag" "refs/tags/${tag}^{}" | tail -n 1 | cut -f1)
+            target="${target:-$(jq -r .targetCommitish <<< "$release")}"
+            test "$target" = "$GITHUB_SHA"
+            if jq -e .isDraft <<< "$release" > /dev/null; then
+              gh release upload "$tag" --clobber artifacts/*.tar.gz artifacts/SHA256SUMS
+              gh release edit "$tag" --draft=false --prerelease
+            fi
+            exit 0
+          fi
+          target=(--target "$GITHUB_SHA")
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            target=(--verify-tag)
+          fi
+          gh release create "$tag" "${target[@]}" --prerelease \
+            --title "$tag" --notes-file CROSS-CODE.md artifacts/*.tar.gz artifacts/SHA256SUMS

@@ -10,6 +10,7 @@ import { stripVTControlCharacters } from "node:util"
 import { RetainedImage } from "./retained-image"
 import { action, parseReleaseVersion, type Policy } from "./updater-action"
 import { errorMessage } from "../util/error"
+import { CrossCodeUpdate } from "./cross-code-update"
 
 export const methods = ["curl", "npm", "pnpm", "bun", "yarn", "vp", "brew", "winget"] as const
 
@@ -149,6 +150,36 @@ const make = Effect.gen(function* () {
   const installedVersion = yield* Ref.make(OPENCODE_VERSION)
   const channel = OPENCODE_CHANNEL.replace(/[^a-zA-Z0-9._-]/g, "-")
   const executable = yield* fs.realPath(process.execPath).pipe(Effect.orElseSucceed(() => process.execPath))
+  const crossRelease = (version?: string) =>
+    Effect.tryPromise({
+      try: (signal) => CrossCodeUpdate.release(signal, version),
+      catch: (cause) => new Error(errorMessage(cause)),
+    })
+  const crossInstall = Effect.fnUntraced(function* (version: string) {
+    if (OPENCODE_LOCAL || path.basename(executable) !== "cross-code")
+      return yield* Effect.fail(
+        new Error("Install the Cross Code release binary as cross-code before running upgrade."),
+      )
+    const installed = yield* Effect.scoped(
+      Effect.gen(function* () {
+        yield* flock.acquire("cli-upgrade", undefined, { timeoutMs: Duration.toMillis("15 minutes") })
+        return yield* Effect.tryPromise({
+          try: async (signal) => {
+            const current = await CrossCodeUpdate.installedVersion(executable, signal)
+            const order = Bun.semver.order(current, version)
+            if (order > 0) throw new Error(`Cross Code ${current} is already newer than ${version}.`)
+            if (order === 0) return current
+            const release = await CrossCodeUpdate.release(signal, version)
+            await CrossCodeUpdate.install(release, executable, signal)
+            return release.version
+          },
+          catch: (cause) => new Error(errorMessage(cause)),
+        })
+      }),
+    )
+    yield* Ref.set(installedVersion, installed)
+    return installed
+  })
   const installedPackage = yield* Effect.gen(function* () {
     const directory = path.dirname(path.dirname(executable))
     const manifest: { name: string; bin?: Record<string, string> } = yield* fs
@@ -257,7 +288,10 @@ const make = Effect.gen(function* () {
     if (installedWinget) return "winget"
     if (!installedPackage || installedOwner) return
 
-    const parts = executable.toLowerCase().split(path.sep).map((part) => part.replace(/^\./, ""))
+    const parts = executable
+      .toLowerCase()
+      .split(path.sep)
+      .map((part) => part.replace(/^\./, ""))
     const checks: Array<{ method: Method; command: string[] }> = [
       { method: "npm", command: [npm, "list", "-g", "--depth=0", ...npmPrefixArgs, installedPackage] },
       { method: "pnpm", command: ["pnpm", "list", "-g", "--depth=0", installedPackage] },
@@ -399,11 +433,13 @@ const make = Effect.gen(function* () {
   })
 
   const latest = (selected?: Method) =>
-    (selected ? Effect.succeed(selected) : method()).pipe(
-      Effect.flatMap((method) =>
-        method === "winget" ? wingetVersion() : release(method).pipe(Effect.map((data) => data.version)),
-      ),
-    )
+    CROSS_CODE
+      ? crossRelease().pipe(Effect.map((data) => data.version))
+      : (selected ? Effect.succeed(selected) : method()).pipe(
+          Effect.flatMap((method) =>
+            method === "winget" ? wingetVersion() : release(method).pipe(Effect.map((data) => data.version)),
+          ),
+        )
 
   const managedError = (owner: { name: string; command: string }, target: string) =>
     new UpgradeError({
@@ -605,7 +641,6 @@ const make = Effect.gen(function* () {
   })
 
   const inspect = Effect.fnUntraced(function* () {
-    if (CROSS_CODE) return undefined
     if (OPENCODE_LOCAL || ["1", "true"].includes(process.env.OPENCODE_DISABLE_AUTOUPDATE?.toLowerCase() ?? "")) {
       yield* Effect.logInfo("update check skipped", {
         reason: OPENCODE_LOCAL ? "local-install" : "disabled",
@@ -626,7 +661,7 @@ const make = Effect.gen(function* () {
       current,
       latest: version,
     })
-    const next = action(current, version, policy)
+    const next = CROSS_CODE && Bun.semver.order(version, current) <= 0 ? "none" : action(current, version, policy)
     if (next === "none") {
       yield* Effect.logInfo("update check done", { action: "up-to-date" })
       return undefined
@@ -636,6 +671,10 @@ const make = Effect.gen(function* () {
   })
 
   const install = Effect.fnUntraced(function* (version: string) {
+    if (CROSS_CODE) {
+      yield* crossInstall(version)
+      return true
+    }
     const detected = yield* method()
     if (!detected) {
       yield* Effect.logWarning("update skipped: installation method not found")
@@ -661,16 +700,18 @@ const make = Effect.gen(function* () {
   })
 
   const check = Effect.fn("cli.updater.check")(function* () {
-    if (CROSS_CODE)
-      return {
-        type: "unavailable" as const,
-        message: "Download Cross Code updates from github.com/moelee835/cross-code/releases.",
-      }
     if (OPENCODE_LOCAL)
       return {
         type: "unavailable" as const,
         message: "This build runs from a source checkout. Use an installed OpenCode release to check for updates.",
       }
+    if (CROSS_CODE) {
+      const { version } = yield* crossRelease()
+      const current = yield* Ref.get(installedVersion)
+      if (Bun.semver.order(version, current) > 0) return { type: "available" as const, version }
+      if (Bun.semver.order(current, OPENCODE_VERSION) > 0) return { type: "installed" as const, version: current }
+      return undefined
+    }
     const detected = yield* method()
     if (!detected && installedOwner) {
       const data = yield* release("npm")
