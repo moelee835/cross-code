@@ -1824,7 +1824,7 @@ const EndpointExperimentalSessionMessagingSetParticipation =
 const EndpointExperimentalSessionMessagingOpenLease =
   (raw: RawClient["server.experimental"]) => (input: ExperimentalSessionMessagingOpenLeaseInput) =>
     preserveEffect<ExperimentalSessionMessagingOpenLeaseOutput>()(
-      raw["sessionMessaging.openLease"]({ payload: { sessions: input["sessions"] } }).pipe(
+      raw["sessionMessaging.openLease"]({ payload: { sessions: input["sessions"], groupID: input["groupID"] } }).pipe(
         Effect.mapError(mapClientError),
       ),
     )
@@ -1834,7 +1834,7 @@ const EndpointExperimentalSessionMessagingRefreshLease =
     preserveEffect<ExperimentalSessionMessagingRefreshLeaseOutput>()(
       raw["sessionMessaging.refreshLease"]({
         params: { leaseID: input["leaseID"] },
-        payload: { sessions: input["sessions"] },
+        payload: { sessions: input["sessions"], groupID: input["groupID"] },
       }).pipe(Effect.mapError(mapClientError)),
     )
 

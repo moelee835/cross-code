@@ -267,6 +267,7 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
           \`assistant_message_id\` text,
           \`result\` text,
           \`depth\` integer DEFAULT 0 NOT NULL,
+          \`group_id\` text,
           CONSTRAINT \`fk_session_messaging_request_sender_session_id_session_v2_id_fk\` FOREIGN KEY (\`sender_session_id\`) REFERENCES \`session_v2\`(\`id\`) ON DELETE CASCADE,
           CONSTRAINT \`fk_session_messaging_request_recipient_session_id_session_v2_id_fk\` FOREIGN KEY (\`recipient_session_id\`) REFERENCES \`session_v2\`(\`id\`) ON DELETE CASCADE
         );

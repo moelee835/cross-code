@@ -172,6 +172,7 @@ export const SessionMessagingRequestTable = sqliteTable(
     assistant_message_id: text().$type<SessionMessage.ID>(),
     result: text(),
     depth: integer().notNull().default(0),
+    group_id: text(),
   },
   (table) => [
     uniqueIndex("session_messaging_request_sender_key_idx").on(table.sender_session_id, table.idempotency_key),

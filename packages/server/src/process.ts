@@ -123,11 +123,12 @@ export const start = Effect.fn("ServerProcess.start")(function* <E, R>(
           password,
           sessionMessaging:
             options.sessionMessaging === true &&
-            FlagResolve.resolve({
-              entries: [],
-              channel: options.app?.channel ?? "latest",
-              overrides: process.env.OPENCODE_FLAGS,
-            }).session_messaging.enabled,
+            (options.sessionMessagingGroupsOnly === true ||
+              FlagResolve.resolve({
+                entries: [],
+                channel: options.app?.channel ?? "latest",
+                overrides: process.env.OPENCODE_FLAGS,
+              }).session_messaging.enabled),
         },
         urls,
       ).pipe(Layer.provideMerge(NodeHttpServer.layerHttpServices)),
@@ -138,6 +139,8 @@ export const start = Effect.fn("ServerProcess.start")(function* <E, R>(
         Context.get(context, SessionRestart.Service),
         Context.get(context, SessionMessaging.Service),
       ).pipe(Effect.provideService(Scope.Scope, applicationScope))
+    } else {
+      yield* Context.get(context, SessionMessaging.Service).start
     }
     // Automations run from any server process (`service`, `opencode serve`, or `--standalone`); the table holds all their state.
     yield* Effect.forkIn(Context.get(context, Automation.Service).run, applicationScope)

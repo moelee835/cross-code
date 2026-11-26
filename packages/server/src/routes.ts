@@ -157,6 +157,7 @@ function makeRoutes<AuthError, AuthServices>(
         options.sessionMessaging === true &&
           !!options.password &&
           (options.hostname === "127.0.0.1" || options.hostname === "::1"),
+        options.sessionMessagingGroupsOnly === true,
       ),
     ),
     Database.node.replace(Database.configured(options.database)),

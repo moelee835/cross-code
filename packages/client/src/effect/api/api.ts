@@ -2614,7 +2614,10 @@ export type ExperimentalSessionMessagingSetParticipationOperation<E = never> = (
   input: ExperimentalSessionMessagingSetParticipationInput,
 ) => Effect.Effect<ExperimentalSessionMessagingSetParticipationOutput, E>
 
-export type ExperimentalSessionMessagingOpenLeaseInput = { readonly sessions: ReadonlyArray<Session.ID> }
+export type ExperimentalSessionMessagingOpenLeaseInput = {
+  readonly sessions: ReadonlyArray<Session.ID>
+  readonly groupID?: string | undefined
+}
 export type ExperimentalSessionMessagingOpenLeaseOutput = SessionMessaging.Lease
 export type ExperimentalSessionMessagingOpenLeaseOperation<E = never> = (
   input: ExperimentalSessionMessagingOpenLeaseInput,
@@ -2623,6 +2626,7 @@ export type ExperimentalSessionMessagingOpenLeaseOperation<E = never> = (
 export type ExperimentalSessionMessagingRefreshLeaseInput = {
   readonly leaseID: SessionMessaging.LeaseID
   readonly sessions: ReadonlyArray<Session.ID>
+  readonly groupID?: string | undefined
 }
 export type ExperimentalSessionMessagingRefreshLeaseOutput = SessionMessaging.Lease
 export type ExperimentalSessionMessagingRefreshLeaseOperation<E = never> = (

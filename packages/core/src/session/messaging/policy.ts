@@ -23,26 +23,34 @@ type DB = Database.Interface["db"]
 type ID = SessionSchema.ID
 const participants = SessionMessagingParticipationTable
 
-export class Service extends Context.Service<
-  Service,
-  {
-    readonly enabled: boolean
-    readonly open: Effect.Effect<ReadonlySet<ID>>
-    readonly lease: (
-      sessions: ReadonlyArray<ID>,
-      leaseID?: SessionMessaging.LeaseID,
-    ) => Effect.Effect<SessionMessaging.Lease | undefined>
-    readonly close: (id: SessionMessaging.LeaseID) => Effect.Effect<void>
-  }
->()("@opencode/SessionMessagingPolicy") {}
+export interface Interface {
+  readonly enabled: boolean
+  readonly groupsOnly: boolean
+  readonly open: Effect.Effect<ReadonlySet<ID>>
+  readonly group: (sessionID: ID) => Effect.Effect<string | undefined>
+  readonly permits: (groupID: string, sessions: ReadonlyArray<ID>) => Effect.Effect<boolean>
+  readonly lease: (
+    sessions: ReadonlyArray<ID>,
+    leaseID?: SessionMessaging.LeaseID,
+    groupID?: string,
+  ) => Effect.Effect<SessionMessaging.Lease | undefined>
+  readonly close: (id: SessionMessaging.LeaseID) => Effect.Effect<void>
+}
 
-const layer = (enabled: boolean) =>
+export class Service extends Context.Service<Service, Interface>()("@opencode/SessionMessagingPolicy") {}
+
+export interface Admission {
+  readonly fs: FSUtil.Interface
+  readonly policy: Interface
+}
+
+const layer = (enabled: boolean, groupsOnly: boolean) =>
   Layer.effect(
     Service,
     Effect.sync(() => {
       const leases = new Map<
         SessionMessaging.LeaseID,
-        { readonly sessions: ReadonlyArray<ID>; readonly expiresAt: number }
+        { readonly sessions: ReadonlyArray<ID>; readonly expiresAt: number; readonly groupID?: string }
       >()
       const active = (now: number) => {
         for (const [id, lease] of leases) if (lease.expiresAt <= now) leases.delete(id)
@@ -50,18 +58,40 @@ const layer = (enabled: boolean) =>
       }
       return Service.of({
         enabled,
+        groupsOnly,
         open: Clock.currentTimeMillis.pipe(
           Effect.map((now) => new Set(Array.from(active(now)).flatMap((lease) => lease.sessions))),
         ),
-        lease: (sessions, id) =>
+        group: (sessionID) =>
+          Clock.currentTimeMillis.pipe(
+            Effect.map((now) => Array.from(active(now)).find((lease) => lease.sessions.includes(sessionID))?.groupID),
+          ),
+        permits: (groupID, sessions) =>
+          Clock.currentTimeMillis.pipe(
+            Effect.map((now) =>
+              Array.from(active(now)).some(
+                (lease) => lease.groupID === groupID && sessions.every((id) => lease.sessions.includes(id)),
+              ),
+            ),
+          ),
+        lease: (sessions, id, groupID) =>
           Clock.currentTimeMillis.pipe(
             Effect.map((now) => {
               active(now)
               if (!enabled || sessions.length > 128 || (id ? !leases.has(id) : leases.size >= 128)) return undefined
+              if (groupsOnly !== (groupID !== undefined)) return undefined
+              if (groupID !== undefined) {
+                if (id && leases.get(id)?.groupID !== groupID) return undefined
+                for (const [otherID, lease] of leases) {
+                  if (otherID === id) continue
+                  if (lease.groupID === groupID || sessions.some((session) => lease.sessions.includes(session)))
+                    return undefined
+                }
+              }
               const leaseID = id ?? SessionMessaging.LeaseID.create()
               const expiresAt = now + 30_000
-              leases.set(leaseID, { expiresAt, sessions: [...new Set(sessions)] })
-              return { leaseID, expiresAt }
+              leases.set(leaseID, { expiresAt, sessions: [...new Set(sessions)], groupID })
+              return { leaseID, expiresAt, groupID }
             }),
           ),
         close: (id) =>
@@ -72,7 +102,8 @@ const layer = (enabled: boolean) =>
     }),
   )
 
-export const configured = (enabled: boolean) => makeGlobalNode({ service: Service, layer: layer(enabled), deps: [] })
+export const configured = (enabled: boolean, groupsOnly = false) =>
+  makeGlobalNode({ service: Service, layer: layer(enabled, groupsOnly), deps: [] })
 export const node = configured(false)
 
 export const eligible = (db: DB, ids: ReadonlyArray<ID>) =>
@@ -149,35 +180,49 @@ export const matchingProject = Effect.fnUntraced(function* <A extends Address>(
   )
 })
 
-export const allowed = Effect.fnUntraced(function* (fs: FSUtil.Interface, db: DB, sender: ID, recipient: ID) {
+export const allowed = Effect.fnUntraced(function* (
+  { fs, policy }: Admission,
+  db: DB,
+  sender: ID,
+  recipient: ID,
+  groupID: string | null,
+) {
   if (sender === recipient) return false
   const [first, second] = yield* participating(db, [sender, recipient])
   if (first === undefined || second === undefined) return false
+  if (policy.groupsOnly) return groupID !== null && (yield* policy.permits(groupID, [sender, recipient]))
+  if (groupID !== null) return false
   return (yield* matchingProject(fs, first, [second])).length > 0
 })
 
 export class Revoked extends Data.TaggedError("SessionMessaging.Revoked") {}
 
-export const guardPromotion = Effect.fnUntraced(function* (db: DB, inboxID: SessionMessage.ID, fs?: FSUtil.Interface) {
+export const guardPromotion = Effect.fnUntraced(function* (db: DB, inboxID: SessionMessage.ID, admission?: Admission) {
   const requests = SessionMessagingRequestTable
   const outbox = SessionMessagingOutboxTable
   const request = yield* db
-    .select({ sender: requests.sender_session_id, recipient: requests.recipient_session_id })
+    .select({ sender: requests.sender_session_id, recipient: requests.recipient_session_id, group: requests.group_id })
     .from(requests)
     .where(eq(requests.inbox_id, inboxID))
     .get()
     .pipe(Effect.orDie)
   if (request) {
-    if (!fs || !(yield* allowed(fs, db, request.sender, request.recipient))) return yield* Effect.die(new Revoked())
+    if (!admission || !(yield* allowed(admission, db, request.sender, request.recipient, request.group)))
+      return yield* Effect.die(new Revoked())
     return
   }
   const notification = yield* db
-    .select({ sender: requests.sender_session_id })
+    .select({ sender: requests.sender_session_id, recipient: requests.recipient_session_id, group: requests.group_id })
     .from(outbox)
     .innerJoin(requests, eq(outbox.request_id, requests.id))
     .where(eq(outbox.inbox_id, inboxID))
     .get()
     .pipe(Effect.orDie)
-  if (notification && (!fs || !(yield* participating(db, [notification.sender])).length))
-    return yield* Effect.die(new Revoked())
+  if (!notification) return
+  if (!admission) return yield* Effect.die(new Revoked())
+  const permitted =
+    notification.group === null && !admission.policy.groupsOnly
+      ? (yield* participating(db, [notification.sender])).length > 0
+      : yield* allowed(admission, db, notification.sender, notification.recipient, notification.group)
+  if (!permitted) return yield* Effect.die(new Revoked())
 })

@@ -200,7 +200,7 @@ const layer = Layer.effect(
                     bus,
                     sessionID,
                     entering && !continuing ? promotable : "steer",
-                    messaging.enabled ? fs : undefined,
+                    messaging.enabled ? { fs, policy: messaging } : undefined,
                   )
                   // A control admitted during context preparation owns this boundary.
                   if (promoted === undefined || promoted === "revoked") return undefined
@@ -301,7 +301,7 @@ const layer = Layer.effect(
           isLocationClosed: lifecycle.isClosed,
           interruption,
           handoffPrepared: pty.handoffPrepared,
-          peerFileSystem: fs,
+          peerAdmission: messaging.enabled ? { fs, policy: messaging } : undefined,
           sessionID,
           assistantMessageID,
           agent: loaded.agent.id,

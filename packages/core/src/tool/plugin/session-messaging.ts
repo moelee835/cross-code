@@ -26,7 +26,7 @@ export const Plugin = {
       .transform((editor) => {
         editor.add({
           name: "session_peers",
-          description: "List other open sessions in this project that opted into peer messaging.",
+          description: "List other open sessions available for peer messaging.",
           input: Schema.Struct({}),
           output: Schema.Array(Peer),
           options: { codemode: false },

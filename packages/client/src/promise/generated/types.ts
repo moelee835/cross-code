@@ -1059,7 +1059,7 @@ export type MachineInvite = {
   reach: Array<MachineReach | { type: "iroh" }>
 }
 
-export type SessionMessagingLease = { leaseID: SessionMessagingLeaseID; expiresAt: number }
+export type SessionMessagingLease = { leaseID: SessionMessagingLeaseID; expiresAt: number; groupID?: string }
 
 export type SessionMessagingReceipt = { requestID: SessionMessagingID; status: SessionMessagingStatus }
 
@@ -4912,13 +4912,17 @@ export type ExperimentalSessionMessagingSetParticipationInput = {
 
 export type ExperimentalSessionMessagingSetParticipationOutput = SessionMessagingParticipation
 
-export type ExperimentalSessionMessagingOpenLeaseInput = { readonly sessions: ReadonlyArray<string> }
+export type ExperimentalSessionMessagingOpenLeaseInput = {
+  readonly sessions: ReadonlyArray<string>
+  readonly groupID?: string | undefined
+}
 
 export type ExperimentalSessionMessagingOpenLeaseOutput = SessionMessagingLease
 
 export type ExperimentalSessionMessagingRefreshLeaseInput = {
   readonly leaseID: string
   readonly sessions: ReadonlyArray<string>
+  readonly groupID?: string | undefined
 }
 
 export type ExperimentalSessionMessagingRefreshLeaseOutput = SessionMessagingLease
