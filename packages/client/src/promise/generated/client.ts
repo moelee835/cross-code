@@ -1857,7 +1857,7 @@ export function make(options: ClientOptions) {
             {
               method: "POST",
               path: `/api/experimental/session-messaging/leases`,
-              body: { sessions: input["sessions"] },
+              body: { sessions: input["sessions"], groupID: input["groupID"] },
               successStatus: 200,
               declaredStatuses: [400, 401, 403],
               empty: false,
@@ -1869,7 +1869,7 @@ export function make(options: ClientOptions) {
             {
               method: "PUT",
               path: `/api/experimental/session-messaging/leases/${encodeURIComponent(input.leaseID)}`,
-              body: { sessions: input["sessions"] },
+              body: { sessions: input["sessions"], groupID: input["groupID"] },
               successStatus: 200,
               declaredStatuses: [400, 401, 403],
               empty: false,

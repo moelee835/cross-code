@@ -41,6 +41,10 @@ cross-code session result --from "$SENDER" "$REQUEST_ID" --json
 
 Add `--key` to reuse the same request on a CLI retry. Models can use `session_peers`, `session_message_send`, `session_message_result`, and `session_message_reply`. Model sends and explicit replies follow the session's tool permissions. If a user steers the receiving turn with a different prompt, the original request reports `needs_reply` and shares only an explicit reply.
 
+### Managed peer groups in headless servers
+
+Set `CROSS_CODE_MANAGED_SESSION_MESSAGING=1` and `OPENCODE_PASSWORD` when starting a dedicated `cross-code serve --hostname 127.0.0.1 --port 0` process. Use a separate `OPENCODE_DB` for each process. The authenticated controller enables participation for each session and registers their IDs together using `POST /api/experimental/session-messaging/leases` with `groupID` and `sessions`. A successful response echoes `groupID`. Refresh the lease before its 30-second expiry and delete it to close the group. Members can exchange requests across project directories. The recipient continues to use its own directory, model, and permissions. [Experimental messaging API](packages/protocol/src/groups/session-messaging.ts)
+
 ## Persist the session event log
 
 Pass `OPENCODE_EVENTS_PERSIST=1` in the server process environment to retain durable events. The default leaves event persistence off.

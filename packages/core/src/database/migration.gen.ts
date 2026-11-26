@@ -66,6 +66,7 @@ import m63 from "./migration/20261120004954_machine-key.js"
 import m64 from "./migration/20261123021500_session_messaging.js"
 import m65 from "./migration/20261123023153_session_messaging_results.js"
 import m66 from "./migration/20261123023724_session_messaging_participation.js"
+import m67 from "./migration/20261126015347_managed_peer_groups.js"
 
 export const migrations = [
   m00,
@@ -135,4 +136,5 @@ export const migrations = [
   m64,
   m65,
   m66,
+  m67,
 ] satisfies DatabaseMigration.Migration[]

@@ -308,7 +308,7 @@ const transformTools = (registry: Tool.Interface, tools: Readonly<Record<string,
   registry.transform((editor) =>
     Object.entries(tools).forEach(([name, tool]) => editor.add({ ...tool, name, options: options ?? tool.options })),
   )
-const layer = Layer.unwrap(
+const makeRunnerLayer = (groupsOnly: boolean) =>
   Effect.map(RunnerState, (state) => {
     const modelTransport = Layer.succeed(
       SessionModelTransport.Service,
@@ -470,7 +470,7 @@ const layer = Layer.unwrap(
       PluginSupervisor.node.replace(Layer.empty),
       Plugin.node.replace(Layer.mock(Plugin.Service, { awaitActivation: Effect.suspend(() => state.activationHook) })),
       SessionModelTransport.node.replace(modelTransport),
-      SessionMessagingPolicy.node.replace(SessionMessagingPolicy.configured(true)),
+      SessionMessagingPolicy.node.replace(SessionMessagingPolicy.configured(true, groupsOnly)),
     ]
     const runnerLayer = AppNodeBuilder.build(SessionRunnerLLM.node, [
       ...replacements,
@@ -558,9 +558,15 @@ const layer = Layer.unwrap(
         SessionExecution.node.replace(execution),
       ],
     )
-  }),
-).pipe(Layer.provideMerge(Layer.sync(RunnerState, makeRunnerState)), Layer.provideMerge(testLLM))
+  })
+const runnerLayerFor = (groupsOnly = false) =>
+  Layer.unwrap(makeRunnerLayer(groupsOnly)).pipe(
+    Layer.provideMerge(Layer.sync(RunnerState, makeRunnerState)),
+    Layer.provideMerge(testLLM),
+  )
+const layer = runnerLayerFor()
 const it = testEffect(layer)
+const managed = testEffect(runnerLayerFor(true))
 const sessionID = Session.ID.make("ses_runner_test")
 const otherSessionID = Session.ID.make("ses_runner_other")
 
@@ -655,8 +661,9 @@ type Scenario = Effect.Success<typeof setup>
 const scenario = (
   name: string,
   body: (s: Scenario) => Effect.gen.Return<void, unknown, Layer.Success<typeof layer> | Scope.Scope>,
+  suite = it,
 ) =>
-  it.effect(
+  suite.effect(
     name,
     Effect.gen(function* () {
       const s = yield* setup
@@ -765,94 +772,139 @@ const userTexts = (request: LLMRequest) => messageTexts(request, "user")
 const systemTexts = (request: LLMRequest) => messageTexts(request, "system")
 const messageRoles = (request: LLMRequest | undefined) => request?.messages.map((message) => message.role)
 
-scenario("continues the sender's turn and accepts a new prompt while the peer's response is held", function* (s) {
-  yield* insertSession(otherSessionID)
-  const messaging = yield* SessionMessaging.Service
-  const tools = yield* Tool.Service
-  const execution = yield* SessionExecution.Service
-  yield* messaging.start
-  yield* messaging.participation(sessionID, true)
-  yield* messaging.participation(otherSessionID, true)
-  yield* messaging.lease({ sessions: [sessionID, otherSessionID] })
-  const receiverStarted = yield* Deferred.make<void>()
-  const releaseReceiver = yield* Deferred.make<void>()
-  const resultDelivered = yield* Deferred.make<void>()
-  const input = {
-    recipientSessionID: otherSessionID,
-    idempotencyKey: "send-to-peer",
-    text: "Check the peer task",
-  }
-  yield* SessionMessagingTools.Plugin.effect(host({ tool: { ...host().tool, transform: tools.transform } })).pipe(
-    Effect.provide(permissionLayer({ assert: () => Effect.void })),
-  )
-  yield* s.llm.push(
-    TestLLM.toolCall("send-to-peer", "session_message_send", {
-      recipientSessionID: input.recipientSessionID,
-      text: input.text,
-    }),
-  )
-  yield* s.llm.serve((request) => {
-    const text = userTexts(request).at(-1)
-    if (text?.endsWith(input.text))
-      return Stream.fromEffect(
-        Deferred.succeed(receiverStarted, undefined).pipe(Effect.andThen(Deferred.await(releaseReceiver))),
-      ).pipe(Stream.flatMap(() => Stream.fromIterable(TestLLM.text("Peer response", "peer-response"))))
-    if (text?.includes("Peer response")) {
-      return Stream.fromEffect(Deferred.succeed(resultDelivered, undefined)).pipe(
-        Stream.flatMap(() => Stream.fromIterable(TestLLM.text("Sender received the result", "sender-result"))),
-      )
+const asynchronousPeerRoundTrip = (groupID?: string) =>
+  function* (s: Scenario) {
+    yield* insertSession(otherSessionID)
+    const messaging = yield* SessionMessaging.Service
+    const tools = yield* Tool.Service
+    const execution = yield* SessionExecution.Service
+    yield* messaging.start
+    yield* messaging.participation(sessionID, true)
+    yield* messaging.participation(otherSessionID, true)
+    yield* messaging.lease({ sessions: [sessionID, otherSessionID], groupID })
+    const receiverStarted = yield* Deferred.make<void>()
+    const releaseReceiver = yield* Deferred.make<void>()
+    const resultDelivered = yield* Deferred.make<void>()
+    const input = {
+      recipientSessionID: otherSessionID,
+      idempotencyKey: "send-to-peer",
+      text: "Check the peer task",
     }
-    if (text === "Ask the peer" && s.executions.length === 0)
-      return TestLLM.toolCall("sender-next-tool", "echo", { text: "Sender kept working" })
-    if (text === "Ask the peer") return TestLLM.text("Sender finished its first turn", "sender-first")
-    return TestLLM.text("Sender handled new input", "sender-second")
-  })
-
-  yield* s.runPrompt("Ask the peer")
-  yield* Deferred.await(receiverStarted)
-  expect(s.executions).toEqual(["Sender kept working"])
-  expect(yield* execution.isActive(otherSessionID)).toBe(true)
-  yield* s.runPrompt("New prompt while the peer is busy")
-  const senderText = (yield* s.messages).flatMap((message) =>
-    message.type === "assistant" ? message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])) : [],
-  )
-  expect(senderText).toEqual(["Sender handled new input", "Sender finished its first turn"])
-
-  const opening = (yield* s.messages).find(
-    (message) =>
-      message.type === "assistant" &&
-      message.content.some((part) => part.type === "tool" && part.name === "session_message_send"),
-  )
-  expect(opening?.type).toBe("assistant")
-  if (opening?.type !== "assistant") throw new Error("Missing peer send tool call")
-  const receipt = yield* messaging.send(sessionID, { ...input, idempotencyKey: `${opening.id}:send-to-peer` })
-  expect(receipt.status).toBe("running")
-  expect(yield* messaging.result(otherSessionID, receipt.requestID)).toEqual(receipt)
-  expect(yield* messaging.result(Session.ID.create(), receipt.requestID)).toBeUndefined()
-  expect(
-    (yield* Effect.flip(
-      messaging.send(sessionID, {
-        ...input,
-        idempotencyKey: `${opening.id}:send-to-peer`,
-        text: "Different text",
+    yield* SessionMessagingTools.Plugin.effect(host({ tool: { ...host().tool, transform: tools.transform } })).pipe(
+      Effect.provide(permissionLayer({ assert: () => Effect.void })),
+    )
+    yield* s.llm.push(
+      TestLLM.toolCall("send-to-peer", "session_message_send", {
+        recipientSessionID: input.recipientSessionID,
+        text: input.text,
       }),
-    ))._tag,
-  ).toBe("SessionMessaging.Conflict")
+    )
+    yield* s.llm.serve((request) => {
+      const text = userTexts(request).at(-1)
+      if (text?.endsWith(input.text))
+        return Stream.fromEffect(
+          Deferred.succeed(receiverStarted, undefined).pipe(Effect.andThen(Deferred.await(releaseReceiver))),
+        ).pipe(Stream.flatMap(() => Stream.fromIterable(TestLLM.text("Peer response", "peer-response"))))
+      if (text?.includes("Peer response")) {
+        return Stream.fromEffect(Deferred.succeed(resultDelivered, undefined)).pipe(
+          Stream.flatMap(() => Stream.fromIterable(TestLLM.text("Sender received the result", "sender-result"))),
+        )
+      }
+      if (text === "Ask the peer" && s.executions.length === 0)
+        return TestLLM.toolCall("sender-next-tool", "echo", { text: "Sender kept working" })
+      if (text === "Ask the peer") return TestLLM.text("Sender finished its first turn", "sender-first")
+      return TestLLM.text("Sender handled new input", "sender-second")
+    })
 
-  yield* Deferred.succeed(releaseReceiver, undefined)
-  yield* execution.awaitIdle(otherSessionID)
-  yield* Deferred.await(resultDelivered)
-  yield* execution.awaitIdle(sessionID)
-  expect(yield* messaging.result(sessionID, receipt.requestID)).toMatchObject({
-    status: "completed",
-    text: "Peer response",
-  })
-  const received = (yield* s.session.messages({ sessionID: otherSessionID })).filter(
-    (message) => message.type === "synthetic",
-  )
-  expect(received.map((message) => message.text.split("\n\n").at(-1))).toEqual([input.text])
-  expect(received[0]?.metadata?.requestID).toBe(receipt.requestID)
-})
+    yield* s.runPrompt("Ask the peer")
+    yield* Deferred.await(receiverStarted)
+    expect(s.executions).toEqual(["Sender kept working"])
+    expect(yield* execution.isActive(otherSessionID)).toBe(true)
+    yield* s.runPrompt("New prompt while the peer is busy")
+    const senderText = (yield* s.messages).flatMap((message) =>
+      message.type === "assistant" ? message.content.flatMap((part) => (part.type === "text" ? [part.text] : [])) : [],
+    )
+    expect(senderText).toEqual(["Sender handled new input", "Sender finished its first turn"])
+
+    const opening = (yield* s.messages).find(
+      (message) =>
+        message.type === "assistant" &&
+        message.content.some((part) => part.type === "tool" && part.name === "session_message_send"),
+    )
+    expect(opening?.type).toBe("assistant")
+    if (opening?.type !== "assistant") throw new Error("Missing peer send tool call")
+    const receipt = yield* messaging.send(sessionID, { ...input, idempotencyKey: `${opening.id}:send-to-peer` })
+    expect(receipt.status).toBe("running")
+    expect(yield* messaging.result(otherSessionID, receipt.requestID)).toEqual(receipt)
+    expect(yield* messaging.result(Session.ID.create(), receipt.requestID)).toBeUndefined()
+    expect(
+      (yield* Effect.flip(
+        messaging.send(sessionID, {
+          ...input,
+          idempotencyKey: `${opening.id}:send-to-peer`,
+          text: "Different text",
+        }),
+      ))._tag,
+    ).toBe("SessionMessaging.Conflict")
+
+    yield* Deferred.succeed(releaseReceiver, undefined)
+    yield* execution.awaitIdle(otherSessionID)
+    yield* Deferred.await(resultDelivered)
+    yield* execution.awaitIdle(sessionID)
+    expect(yield* messaging.result(sessionID, receipt.requestID)).toMatchObject({
+      status: "completed",
+      text: "Peer response",
+    })
+    const received = (yield* s.session.messages({ sessionID: otherSessionID })).filter(
+      (message) => message.type === "synthetic",
+    )
+    expect(received.map((message) => message.text.split("\n\n").at(-1))).toEqual([input.text])
+    expect(received[0]?.metadata?.requestID).toBe(receipt.requestID)
+  }
+
+scenario(
+  "continues the sender's turn and accepts a new prompt while the peer's response is held",
+  asynchronousPeerRoundTrip(),
+)
+scenario(
+  "continues the sender's work and returns the result in a managed peer group",
+  asynchronousPeerRoundTrip("team"),
+  managed,
+)
+
+scenario(
+  "revokes a queued peer request when its managed group closes",
+  function* (s) {
+    yield* insertSession(otherSessionID)
+    const messaging = yield* SessionMessaging.Service
+    yield* messaging.start
+    yield* messaging.participation(sessionID, true)
+    yield* messaging.participation(otherSessionID, true)
+    const lease = yield* messaging.lease({ groupID: "team", sessions: [sessionID, otherSessionID] })
+    const accepted = yield* Queue.unbounded<void>()
+    yield* s.bus.subscribe(SessionEvent.InboxEnqueued).pipe(
+      Stream.filter((event) => event.data.sessionID === otherSessionID),
+      Stream.runForEach(() => Queue.offer(accepted, undefined)),
+      Effect.forkScoped({ startImmediately: true }),
+    )
+    const gate = yield* s.llm.gate()
+    yield* s.session.prompt({ sessionID: otherSessionID, text: "Initial work" })
+    yield* gate.started
+    yield* Queue.take(accepted)
+    const receipt = yield* messaging.send(sessionID, {
+      recipientSessionID: otherSessionID,
+      text: "Do not run",
+      idempotencyKey: "revoked",
+    })
+    yield* Queue.take(accepted)
+    yield* messaging.close(lease.leaseID)
+    yield* gate.release
+    const execution = yield* SessionExecution.Service
+    yield* execution.awaitIdle(otherSessionID)
+    expect(yield* messaging.result(sessionID, receipt.requestID)).toEqual({ ...receipt, status: "cancelled" })
+  },
+  managed,
+)
 
 scenario("shares an explicit reply after another prompt steers the peer's ongoing turn", function* (s) {
   yield* insertSession(otherSessionID)
@@ -2301,9 +2353,7 @@ describe("SessionRunnerLLM", () => {
     expect(userTexts(last)).toEqual(["First", "Fourth"])
     expect(last.system.map((part) => part.text).join("\n")).not.toContain("Entered mode")
     // Clients still see every message; only the model context hides the stale update.
-    expect((yield* s.messages).filter((message) => message.type === "system")).toMatchObject([
-      { text: "Entered mode" },
-    ])
+    expect((yield* s.messages).filter((message) => message.type === "system")).toMatchObject([{ text: "Entered mode" }])
   })
 
   scenario("uses the selected model family prompt when the agent does not override it", function* (s) {

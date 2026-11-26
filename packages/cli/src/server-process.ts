@@ -84,8 +84,11 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
         yield* RetainedImage.retain(global.cache, "service")
       const { start } = yield* Effect.promise(() => import("@opencode/server/process"))
       const environmentPassword = yield* Env.password
+      const managedMessaging = options.mode === "default" && truthy(process.env.CROSS_CODE_MANAGED_SESSION_MESSAGING)
+      if (managedMessaging && (!environmentPassword || (hostname !== "127.0.0.1" && hostname !== "::1")))
+        return yield* Effect.fail(new Error("Managed session messaging requires a loopback bind and OPENCODE_PASSWORD"))
       // Keep the lease credential out of the environment inherited by tools.
-      if (options.mode === "stdio") {
+      if (options.mode === "stdio" || managedMessaging) {
         delete process.env.OPENCODE_PASSWORD
         delete process.env.OPENCODE_SERVER_PASSWORD
       }
@@ -110,7 +113,8 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
           port,
           cors: options.cors ?? config.cors,
           password,
-          sessionMessaging: options.mode === "service" && config.remote === undefined,
+          sessionMessaging: managedMessaging || (options.mode === "service" && config.remote === undefined),
+          sessionMessagingGroupsOnly: managedMessaging,
           pty: { handoff },
           simulation: truthy(process.env.OPENCODE_SIMULATE),
           database: {

@@ -73,10 +73,12 @@ export type LeaseID = typeof LeaseID.Type
 export interface LeaseInput extends Schema.Schema.Type<typeof LeaseInput> {}
 export const LeaseInput = Schema.Struct({
   sessions: Schema.Array(SessionID).check(Schema.isMaxLength(128)),
+  groupID: Schema.String.check(Schema.isPattern(/^[a-zA-Z0-9_-]{1,128}$/)).pipe(optional),
 }).annotate({ identifier: "SessionMessaging.LeaseInput" })
 
 export interface Lease extends Schema.Schema.Type<typeof Lease> {}
 export const Lease = Schema.Struct({
   leaseID: LeaseID,
   expiresAt: Schema.Int,
+  groupID: LeaseInput.fields.groupID,
 }).annotate({ identifier: "SessionMessaging.Lease" })

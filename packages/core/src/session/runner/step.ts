@@ -10,7 +10,7 @@ import {
 import type { Agent } from "@opencode/schema/agent"
 import { Cause, Clock, Data, Deferred, Effect, Exit, Fiber, Option, Stream } from "effect"
 import { SessionError } from "@opencode/schema/session-error"
-import type { FSUtil } from "@opencode/util/fs-util"
+import type { SessionMessagingPolicy } from "../messaging/policy.js"
 import { Bus } from "../../bus.js"
 import { Database } from "../../database/database.js"
 import { Permission } from "../../permission.js"
@@ -49,7 +49,7 @@ interface Input {
   readonly interruption?: () => "user" | "shutdown" | undefined
   /** Whether this server is handing its process daemon over to the next one (see `PersistentPty.handoffPrepared`). */
   readonly handoffPrepared?: () => boolean
-  readonly peerFileSystem?: FSUtil.Interface
+  readonly peerAdmission?: SessionMessagingPolicy.Admission
   readonly sessionID: SessionSchema.ID
   readonly assistantMessageID: SessionMessage.ID
   readonly agent: Agent.ID
@@ -315,7 +315,7 @@ export const make = Effect.gen(function* () {
               Exit.isSuccess(stream) &&
               !interrupted &&
               !toolFailure
-            const fs = input.peerFileSystem
+            const admission = input.peerAdmission
             yield* bus.publish(
               SessionEvent.Step.Ended,
               {
@@ -328,8 +328,11 @@ export const make = Effect.gen(function* () {
                 snapshot,
                 files,
               },
-              final && fs
-                ? { commit: () => SessionMessagingProjection.complete(fs, db, input.sessionID, assistantMessageID) }
+              final && admission
+                ? {
+                    commit: () =>
+                      SessionMessagingProjection.complete(admission, db, input.sessionID, assistantMessageID),
+                  }
                 : undefined,
             )
           }

@@ -3,7 +3,6 @@ export * as SessionInbox from "./inbox.js"
 import { and, asc, eq, or } from "drizzle-orm"
 import { Context, DateTime, Effect, Layer, Schema } from "effect"
 import { makeGlobalNode } from "@opencode/util/effect/app-node"
-import type { FSUtil } from "@opencode/util/fs-util"
 import {
   Compaction,
   CompactionPayload,
@@ -533,7 +532,7 @@ const publish = Effect.fn("SessionInbox.publish")(function* (
   bus: Bus.Interface,
   sessionID: SessionSchema.ID,
   rows: ReadonlyArray<typeof SessionInboxTable.$inferSelect>,
-  messaging?: FSUtil.Interface,
+  messaging?: SessionMessagingPolicy.Admission,
 ) {
   const promoted = yield* Effect.forEach(rows, (row) => {
     if (row.type !== "move" && row.type !== "user" && row.type !== "synthetic")
@@ -581,7 +580,7 @@ export const promote = Effect.fn("SessionInbox.promote")(function* (
   bus: Bus.Interface,
   sessionID: SessionSchema.ID,
   scope: Promotable,
-  messaging?: FSUtil.Interface,
+  messaging?: SessionMessagingPolicy.Admission,
 ) {
   return yield* serialized(
     sessionID,

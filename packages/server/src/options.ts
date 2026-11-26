@@ -18,6 +18,7 @@ export const ServerOptions = Schema.Struct({
   cors: Schema.optional(Schema.Array(Schema.String)),
   simulation: Schema.optional(Schema.Boolean),
   sessionMessaging: Schema.optional(Schema.Boolean),
+  sessionMessagingGroupsOnly: Schema.optional(Schema.Boolean),
   database: Schema.optional(Database.Options),
   pty: Schema.optional(PersistentPty.Options),
   events: Schema.optional(
