@@ -21,7 +21,9 @@
   <a href="#documentation">Documentation</a>
 </p>
 
-[![Upstream OpenCode terminal interface](services/site/public/v1/docs/assets/lander/screenshot.png)](https://github.com/anomalyco/opencode)
+[![Cross Code product tour preview showing the Korean peer messaging example](.github/assets/cross-code-product-tour.webp)](.github/assets/cross-code-product-tour.mp4)
+
+[Watch the 28-second product tour](.github/assets/cross-code-product-tour.mp4) to see the language switch, first prompt, and asynchronous peer messaging example.
 
 ---
 
